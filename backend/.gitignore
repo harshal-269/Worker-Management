@@ -1,0 +1,61 @@
+
+# Spring Boot / Java
+HELP.md
+target/
+**/target/
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+# IDEs
+.apt_generated/
+.classpath
+.factorypath
+.project
+.settings/
+.springBeans
+.sts4-cache/
+.idea/
+*.iws
+*.iml
+*.ipr
+.vscode/
+
+# NetBeans / Gradle
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Secrets and local environment files
+.env
+.env.*
+!.env.example
+**/application-local.properties
+
+# Logs
+*.log
+
+
+# Additional Java build files
+**/target/
+
+# Local configuration and secrets
+**/application-local.properties
+**/application-secret.properties
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Uploaded files (keep local for now)
+uploads/
