@@ -17,3 +17,21 @@ frontend/dist/
 
 # Logs
 *.log
+
+# Sensitive backend configuration
+backend/src/main/resources/application.properties
+backend/src/main/resources/application-local.properties
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Build files
+**/target/
+**/node_modules/
+**/dist/
+
+# User uploaded files
+uploads/
+

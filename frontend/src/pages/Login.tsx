@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -37,6 +38,13 @@ function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // Google OAuth login
+  const handleGoogleLogin = () => {
+    window.location.href =
+      "http://localhost:8080/oauth2/authorization/google";
+  };
+
+  // Existing email/password login
   const handleSubmit = async (
     event: React.FormEvent<HTMLFormElement>,
   ) => {
@@ -49,23 +57,6 @@ function Login() {
       const response = await api.post<LoginResponse>("/auth/login", {
         email: email.trim(),
         password,
-      });
-
-      console.log("Login API response:", {
-        ...response.data,
-        token: response.data?.token ? "HIDDEN" : undefined,
-        accessToken: response.data?.accessToken ? "HIDDEN" : undefined,
-        jwt: response.data?.jwt ? "HIDDEN" : undefined,
-        user: response.data?.user
-          ? {
-              ...response.data.user,
-              token: response.data.user.token ? "HIDDEN" : undefined,
-              accessToken: response.data.user.accessToken
-                ? "HIDDEN"
-                : undefined,
-              jwt: response.data.user.jwt ? "HIDDEN" : undefined,
-            }
-          : undefined,
       });
 
       const data = response.data;
@@ -82,15 +73,11 @@ function Login() {
       const role = data?.role ?? user?.role;
 
       if (!token) {
-        throw new Error(
-          "Login response does not contain a token. Check the login API response in the browser console.",
-        );
+        throw new Error("Login response does not contain a token.");
       }
 
       if (!role) {
-        throw new Error(
-          "Login succeeded, but the response does not contain your account role. Check the login API response in the browser console.",
-        );
+        throw new Error("Login response does not contain an account role.");
       }
 
       const normalizedRole = role.toUpperCase().replace(/^ROLE_/, "");
@@ -101,7 +88,10 @@ function Login() {
 
       localStorage.setItem("token", token);
       localStorage.setItem("role", normalizedRole);
-      localStorage.setItem("email", data.email ?? user?.email ?? email.trim());
+      localStorage.setItem(
+        "email",
+        data.email ?? user?.email ?? email.trim(),
+      );
 
       if (normalizedRole === "ADMIN") {
         navigate("/admin/dashboard", { replace: true });
@@ -140,6 +130,8 @@ function Login() {
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="grid min-h-screen lg:grid-cols-2">
+
+        {/* Left branding section */}
         <div className="relative hidden overflow-hidden bg-emerald-700 p-12 text-white lg:flex lg:flex-col lg:justify-between xl:p-16">
           <div className="absolute -right-24 -top-24 h-80 w-80 rounded-full bg-emerald-500/40 blur-3xl" />
 
@@ -186,8 +178,10 @@ function Login() {
           </p>
         </div>
 
+        {/* Right login section */}
         <div className="flex items-center justify-center px-5 py-12 sm:px-10">
           <div className="w-full max-w-md">
+
             <Link
               to="/"
               className="mb-10 inline-flex items-center gap-2 text-sm font-semibold text-slate-500 transition hover:text-emerald-700"
@@ -217,6 +211,7 @@ function Login() {
               </p>
             </div>
 
+            {/* Email and password login */}
             <form onSubmit={handleSubmit} className="mt-8 space-y-5">
               <div>
                 <label
@@ -249,6 +244,7 @@ function Login() {
                   >
                     Password
                   </label>
+
                   <Link
                     to="/forgot-password"
                     className="text-sm font-semibold text-emerald-700 hover:text-emerald-800"
@@ -269,6 +265,7 @@ function Login() {
                     required
                     className="w-full bg-transparent py-3.5 text-sm outline-none placeholder:text-slate-400"
                   />
+
                   <button
                     type="button"
                     aria-label={showPassword ? "Hide password" : "Show password"}
@@ -298,11 +295,50 @@ function Login() {
                 disabled={loading}
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-4 font-bold text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
               >
-                {loading && <LoaderCircle size={19} className="animate-spin" />}
+                {loading && (
+                  <LoaderCircle size={19} className="animate-spin" />
+                )}
                 {loading ? "Signing in..." : "Sign in"}
               </button>
             </form>
 
+            {/* Google OAuth */}
+            <div className="my-6 flex items-center gap-4">
+              <div className="h-px flex-1 bg-slate-200" />
+              <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
+                OR CONTINUE WITH
+              </span>
+              <div className="h-px flex-1 bg-slate-200" />
+            </div>
+
+            <button
+              type="button"
+              onClick={handleGoogleLogin}
+              className="flex w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-5 py-3.5 font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+            >
+              <svg viewBox="0 0 48 48" className="h-5 w-5">
+                <path
+                  fill="#EA4335"
+                  d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 3.01 13.22l7.98 6.19C12.9 13.72 18.01 9.5 24 9.5Z"
+                />
+                <path
+                  fill="#4285F4"
+                  d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.76 7.18l7.73 6C44.42 37.98 46.98 31.85 46.98 24.55Z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M10.99 28.59a14.4 14.4 0 0 1-.76-4.59c0-1.6.28-3.14.76-4.59l-7.98-6.19A23.9 23.9 0 0 0 0 24c0 3.87.93 7.52 3.01 10.78l7.98-6.19Z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M24 48c6.48 0 11.93-2.13 15.91-5.8l-7.73-6c-2.14 1.44-4.89 2.3-8.18 2.3-5.99 0-11.1-4.22-13.01-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48Z"
+                />
+              </svg>
+
+              Continue with Google
+            </button>
+
+            {/* Registration */}
             <div className="my-7 flex items-center gap-4">
               <div className="h-px flex-1 bg-slate-200" />
               <span className="text-xs font-medium uppercase tracking-wider text-slate-400">

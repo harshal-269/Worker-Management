@@ -1,3 +1,4 @@
+
 package com.localworker.backend.model;
 
 import jakarta.persistence.*;
@@ -18,13 +19,15 @@ public class User {
 
     @NotBlank(message = "Email is required")
     @Email(message = "Invalid email format")
+    @Column(nullable = false)
     private String email;
 
-    @NotBlank(message = "Phone is required")
+    // Google users may not have provided a phone number.
+    @Column(nullable = true)
     private String phone;
 
-    @NotBlank(message = "Password is required")
-    @Size(min = 6, message = "Password must contain at least 6 characters")
+    // Google users authenticate through Google, not a local password.
+    @Column(nullable = true)
     private String password;
 
     @Enumerated(EnumType.STRING)
@@ -33,14 +36,8 @@ public class User {
     public User() {
     }
 
-    public User(
-            Long id,
-            String name,
-            String email,
-            String phone,
-            String password,
-            Role role) {
-
+    public User(Long id, String name, String email,
+                String phone, String password, Role role) {
         this.id = id;
         this.name = name;
         this.email = email;

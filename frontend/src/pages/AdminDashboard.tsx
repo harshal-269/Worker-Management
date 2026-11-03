@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -13,13 +14,10 @@ import {
   TrendingUp,
   IndianRupee,
   CheckCircle2,
-  Clock,
   MapPin,
   ShieldCheck,
-  UserRound,
   Ban,
   Check,
-  XCircle,
   Star,
 } from "lucide-react";
 
@@ -269,7 +267,6 @@ function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-800">
-      {/* Mobile overlay */}
       {sidebarOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/40 lg:hidden"
@@ -277,7 +274,6 @@ function AdminDashboard() {
         />
       )}
 
-      {/* Sidebar */}
       <aside
         className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-gray-100 bg-white transition-transform duration-300 lg:translate-x-0 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
@@ -353,9 +349,7 @@ function AdminDashboard() {
         </div>
       </aside>
 
-      {/* Main content */}
       <main className="min-h-screen lg:ml-64">
-        {/* Topbar */}
         <header className="sticky top-0 z-30 flex h-20 items-center justify-between border-b border-gray-100 bg-white/95 px-4 backdrop-blur sm:px-6 lg:px-10">
           <div className="flex items-center gap-3">
             <button
@@ -392,7 +386,6 @@ function AdminDashboard() {
         </header>
 
         <div className="mx-auto max-w-7xl space-y-8 p-4 sm:p-6 lg:p-10">
-          {/* Overview */}
           <section id="overview" className="scroll-mt-28">
             <div>
               <p className="text-sm font-semibold text-emerald-700">
@@ -469,7 +462,6 @@ function AdminDashboard() {
               })}
             </div>
 
-            {/* Quick actions */}
             <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-3">
               <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm xl:col-span-2">
                 <div className="flex items-center justify-between gap-4">
@@ -563,7 +555,6 @@ function AdminDashboard() {
             </div>
           </section>
 
-          {/* Customers */}
           <section id="customers" className="scroll-mt-28">
             <div>
               <p className="text-sm font-semibold text-emerald-700">
@@ -673,7 +664,6 @@ function AdminDashboard() {
             </div>
           </section>
 
-          {/* Workers */}
           <section id="workers" className="scroll-mt-28">
             <div>
               <p className="text-sm font-semibold text-emerald-700">
@@ -851,7 +841,6 @@ function AdminDashboard() {
             </p>
           </section>
 
-          {/* Bookings */}
           <section id="bookings" className="scroll-mt-28">
             <div>
               <p className="text-sm font-semibold text-emerald-700">
@@ -993,7 +982,6 @@ function AdminDashboard() {
             </p>
           </section>
 
-          {/* Footer */}
           <footer className="border-t border-gray-200 py-6 text-center text-sm text-gray-500">
             © 2026 LocalWorker. Administration Dashboard.
             <p className="mt-2 text-xs text-gray-400">

@@ -1,8 +1,11 @@
+
 import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
 
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import OAuthCallback from "./pages/OAuthCallback";
+
 import CustomerDashboard from "./pages/CustomerDashboard";
 import WorkerDashboard from "./pages/WorkerDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -34,26 +37,17 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public pages */}
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
 
+        {/* Google OAuth callback */}
+        <Route path="/oauth2/callback" element={<OAuthCallback />} />
+
         <Route path="/admin/dashboard" element={<AdminDashboard />} />
+        <Route path="/customer/dashboard" element={<CustomerDashboard />} />
+        <Route path="/worker/dashboard" element={<WorkerDashboard />} />
 
-        {/* Customer dashboard */}
-        <Route
-          path="/customer/dashboard"
-          element={<CustomerDashboard />}
-        />
-
-        {/* Worker dashboard */}
-        <Route
-          path="/worker/dashboard"
-          element={<WorkerDashboard />}
-        />
-
-        {/* Fallback */}
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
