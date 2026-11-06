@@ -20,12 +20,14 @@ interface LoginResponse {
   jwt?: string;
   role?: string;
   email?: string;
+  name?: string;
   user?: {
     token?: string;
     accessToken?: string;
     jwt?: string;
     role?: string;
     email?: string;
+    name?: string;
   };
 }
 
@@ -88,10 +90,20 @@ function Login() {
 
       localStorage.setItem("token", token);
       localStorage.setItem("role", normalizedRole);
-      localStorage.setItem(
-        "email",
-        data.email ?? user?.email ?? email.trim(),
-      );
+      const authenticatedEmail =
+        data.email ?? user?.email ?? email.trim();
+      const authenticatedName =
+        data.name ?? user?.name ?? "";
+
+      localStorage.setItem("email", authenticatedEmail);
+
+      if (authenticatedName.trim()) {
+        localStorage.setItem("name", authenticatedName.trim());
+      } else {
+        // Never keep a previous account's name when the current response
+        // does not contain one.
+        localStorage.removeItem("name");
+      }
 
       if (normalizedRole === "ADMIN") {
         navigate("/admin/dashboard", { replace: true });

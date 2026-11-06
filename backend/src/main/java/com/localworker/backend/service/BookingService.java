@@ -47,15 +47,10 @@ public class BookingService {
 
         String email = getCurrentUserEmail();
 
-        User customer = userRepository.findById(request.getCustomerId())
+        // Resolve the customer from the authenticated JWT, never from a client-supplied ID.
+        User customer = userRepository.findByEmailIgnoreCase(email)
                 .orElseThrow(() ->
-                        new RuntimeException("Customer not found"));
-
-        if (!customer.getEmail().equalsIgnoreCase(email)) {
-            throw new AccessDeniedException(
-                    "You can create bookings only for yourself"
-            );
-        }
+                        new RuntimeException("Customer account not found"));
 
         if (customer.getRole() != Role.CUSTOMER) {
             throw new AccessDeniedException(
@@ -363,6 +358,16 @@ public class BookingService {
         response.setServiceName(
                 booking.getService().getName()
         );
+
+        response.setCustomerName(booking.getCustomer().getName());
+        response.setCustomerEmail(booking.getCustomer().getEmail());
+        response.setCustomerPhone(booking.getCustomer().getPhone());
+
+        response.setWorkerName(booking.getWorker().getUser().getName());
+        response.setWorkerEmail(booking.getWorker().getUser().getEmail());
+        response.setWorkerPhone(booking.getWorker().getUser().getPhone());
+        response.setWorkerLocation(booking.getWorker().getLocation());
+        response.setWorkerExperience(booking.getWorker().getExperience());
 
         response.setScheduledAt(
                 booking.getScheduledAt()

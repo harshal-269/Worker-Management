@@ -13,7 +13,6 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.Map;
 
 @Service
@@ -35,14 +34,17 @@ public class GoogleAuthService {
     @Transactional
     public User processGoogleUser(OAuth2User oauth2User) {
 
+        if (oauth2User == null) {
+            throw oauthError("Google user information is missing");
+        }
+
         Map<String, Object> attributes = oauth2User.getAttributes();
 
-        String googleId = (String) attributes.get("sub");
-        String email = (String) attributes.get("email");
-        String name = (String) attributes.get("name");
+        String googleId = getStringAttribute(attributes, "sub");
+        String email = getStringAttribute(attributes, "email");
+        String name = getStringAttribute(attributes, "name");
 
-        Boolean emailVerified =
-                (Boolean) attributes.get("email_verified");
+        Object emailVerified = attributes.get("email_verified");
 
         if (googleId == null || googleId.isBlank()) {
             throw oauthError("Google account ID is missing");
@@ -56,46 +58,36 @@ public class GoogleAuthService {
             throw oauthError("Google email is not verified");
         }
 
-        // 1. Check whether this Google account is already linked.
-        return oauthAccountRepository
-                .findByProviderAndProviderUserId(PROVIDER, googleId)
-                .map(OAuthAccount::getUser)
-                .orElseGet(() -> createOrLinkGoogleAccount(
-                        googleId, email, name
-                ));
-    }
+        email = email.trim().toLowerCase(java.util.Locale.ROOT);
 
-    private User createOrLinkGoogleAccount(
-            String googleId,
-            String email,
-            String name) {
+        // 1. Check existing Google identity.
+        var existingOAuthAccount =
+                oauthAccountRepository.findByProviderAndProviderUserId(
+                        PROVIDER, googleId);
 
-        // 2. Check existing LocalWorker accounts with this email.
-        List<User> existingUsers =
-                userRepository.findAllByEmail(email);
-
-        if (existingUsers.size() > 1) {
-            throw oauthError(
-                    "Multiple accounts use this email. Contact support."
-            );
+        if (existingOAuthAccount.isPresent()) {
+            return existingOAuthAccount.get().getUser();
         }
+
+        // 2. Check whether a LocalWorker account already exists.
+        var existingUser = userRepository.findByEmailIgnoreCase(email);
 
         User user;
 
-        if (existingUsers.size() == 1) {
+        if (existingUser.isPresent()) {
 
-            // Link the verified Google identity to the existing account.
-            user = existingUsers.get(0);
+            // Preserve the existing user's role and account details.
+            user = existingUser.get();
 
         } else {
 
-            // 3. Register a new Google user.
+            // 3. Register a new Google customer.
             user = new User();
 
             user.setName(
                     name != null && !name.isBlank()
-                            ? name
-                            : email.split("@")[0]
+                            ? name.trim()
+                            : email.substring(0, email.indexOf("@"))
             );
 
             user.setEmail(email);
@@ -106,13 +98,24 @@ public class GoogleAuthService {
             user = userRepository.save(user);
         }
 
-        // 4. Save the Google identity mapping.
+        // 4. Link the Google identity.
         OAuthAccount account =
                 new OAuthAccount(PROVIDER, googleId, user);
 
         oauthAccountRepository.save(account);
 
         return user;
+    }
+
+    private String getStringAttribute(
+            Map<String, Object> attributes,
+            String key) {
+
+        Object value = attributes.get(key);
+
+        return value instanceof String stringValue
+                ? stringValue
+                : null;
     }
 
     private OAuth2AuthenticationException oauthError(String message) {

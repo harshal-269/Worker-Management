@@ -4,8 +4,8 @@ package com.localworker.backend.controller;
 import com.localworker.backend.dto.LoginRequest;
 import com.localworker.backend.dto.LoginResponse;
 import com.localworker.backend.dto.RegisterRequest;
+import com.localworker.backend.dto.RegisterResponse;
 import com.localworker.backend.dto.OAuthExchangeRequest;
-import com.localworker.backend.model.User;
 import com.localworker.backend.service.AuthService;
 import com.localworker.backend.service.OAuthLoginCodeService;
 
@@ -30,10 +30,12 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public User register(
+    public ResponseEntity<RegisterResponse> register(
             @Valid @RequestBody RegisterRequest request) {
 
-        return authService.register(request);
+        RegisterResponse response = authService.register(request);
+
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/login")

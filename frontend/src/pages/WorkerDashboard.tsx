@@ -17,14 +17,17 @@ import {
   Phone,
   Mail,
   Wrench,
-  Zap,
   ShieldCheck,
-  Bell,
   Search,
   Check,
+  ChevronDown,
   XCircle,
+  Plus,
+  Trash2,
+  RefreshCw,
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import NotificationBell from "./NotificationBell";
 
 type BookingStatus =
   | "PENDING"
@@ -44,38 +47,31 @@ interface Worker {
   profileImage: string | null;
 }
 
+interface ServiceItem {
+  id: number;
+  name: string;
+  description: string;
+}
+
 interface Booking {
   id: number;
   customerId: number;
   workerId: number;
   serviceId: number;
   serviceName: string;
+  customerName?: string | null;
+  customerEmail?: string | null;
+  customerPhone?: string | null;
+  workerName?: string | null;
+  workerEmail?: string | null;
+  workerPhone?: string | null;
+  workerLocation?: string | null;
+  workerExperience?: number | null;
   scheduledAt: string;
   address: string;
   problemDescription: string;
   status: BookingStatus;
 }
-
-const services = [
-  {
-    name: "Plumbing",
-    description: "Tap repair, pipe installation and leakage repair",
-    price: "₹300 onwards",
-    icon: Wrench,
-  },
-  {
-    name: "Electrical Repairs",
-    description: "Wiring, switches and electrical troubleshooting",
-    price: "₹400 onwards",
-    icon: Zap,
-  },
-  {
-    name: "Home Maintenance",
-    description: "General household repair and maintenance",
-    price: "₹500 onwards",
-    icon: BriefcaseBusiness,
-  },
-];
 
 const reviews = [
   {
@@ -116,11 +112,41 @@ function WorkerDashboard() {
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
 
   const [isAvailable, setIsAvailable] = useState(true);
+  const [availabilityUpdating, setAvailabilityUpdating] = useState(false);
+  const [availabilityError, setAvailabilityError] = useState("");
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [bookingsLoading, setBookingsLoading] = useState(true);
   const [bookingsError, setBookingsError] = useState("");
   const [bookingActionLoading, setBookingActionLoading] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [showAllBookings, setShowAllBookings] = useState(false);
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [bookingDetailsLoading, setBookingDetailsLoading] = useState(false);
+  const [bookingDetailsError, setBookingDetailsError] = useState("");
+
+  const [workerServices, setWorkerServices] = useState<ServiceItem[]>([]);
+  const [serviceCatalog, setServiceCatalog] = useState<ServiceItem[]>([]);
+  const [servicesLoading, setServicesLoading] = useState(true);
+  const [servicesError, setServicesError] = useState("");
+  const [serviceActionLoading, setServiceActionLoading] = useState<number | null>(null);
+  const [selectedServiceId, setSelectedServiceId] = useState("");
+  const [showAddService, setShowAddService] = useState(false);
+
+  const openBookingDetails = async (bookingId: number) => {
+    setBookingDetailsLoading(true);
+    setBookingDetailsError("");
+    setSelectedBooking(null);
+    try {
+      const response = await api.get<Booking>(`/bookings/${bookingId}`);
+      setSelectedBooking(response.data);
+    } catch (error) {
+      console.error("Unable to load booking details:", error);
+      setBookingDetailsError("Unable to load booking details. Please try again.");
+    } finally {
+      setBookingDetailsLoading(false);
+    }
+  };
+
 
   useEffect(() => {
     let imageObjectUrl: string | null = null;
@@ -132,7 +158,7 @@ function WorkerDashboard() {
         setWorkerError("");
 
         // Fetch worker details using the existing JWT-enabled Axios client.
-        const response = await api.get<Worker>("/workers/2");
+        const response = await api.get<Worker>("/workers/me");
 
         if (cancelled) return;
 
@@ -182,25 +208,153 @@ function WorkerDashboard() {
     };
   }, []);
 
-  useEffect(() => {
-    void loadBookings();
-  }, []);
 
-  const loadBookings = async () => {
+useEffect(() => {
+  let isMounted = true;
+  let isFetching = false;
+
+  const loadBookings = async (showLoading = false) => {
+    if (isFetching) return;
+
     try {
-      setBookingsLoading(true);
-      setBookingsError("");
+      isFetching = true;
+
+      if (showLoading && isMounted) {
+        setBookingsLoading(true);
+        setBookingsError("");
+      }
+
       const response = await api.get<Booking[]>("/bookings/my");
-      setBookings(response.data);
+
+      if (isMounted) {
+        setBookings(response.data);
+        setBookingsError("");
+      }
     } catch (error) {
       console.error("Unable to load worker bookings:", error);
-      setBookingsError("Unable to load bookings. Please refresh and try again.");
+
+      if (isMounted && showLoading) {
+        setBookingsError(
+          "Unable to load bookings. Please refresh and try again.",
+        );
+      }
     } finally {
-      setBookingsLoading(false);
+      isFetching = false;
+
+      if (isMounted && showLoading) {
+        setBookingsLoading(false);
+      }
     }
   };
 
-  const workerName = worker?.name ?? "Worker";
+  // Load bookings immediately when the dashboard opens.
+  void loadBookings(true);
+
+  // Poll only while the dashboard tab is visible.
+  const intervalId = window.setInterval(() => {
+    if (document.visibilityState === "visible") {
+      void loadBookings();
+    }
+  }, 10000);
+
+  // Refresh immediately when the worker returns to this tab.
+  const handleVisibilityChange = () => {
+    if (document.visibilityState === "visible") {
+      void loadBookings();
+    }
+  };
+
+  document.addEventListener("visibilitychange", handleVisibilityChange);
+
+  return () => {
+    isMounted = false;
+    window.clearInterval(intervalId);
+    document.removeEventListener("visibilitychange", handleVisibilityChange);
+  };
+}, []);
+
+
+  const loadWorkerServices = async (showLoading = true) => {
+    try {
+      if (showLoading) {
+        setServicesLoading(true);
+      }
+      setServicesError("");
+
+      const [assignedResponse, catalogResponse] = await Promise.all([
+        api.get<ServiceItem[]>("/workers/me/services"),
+        api.get<ServiceItem[]>("/services"),
+      ]);
+
+      setWorkerServices(assignedResponse.data);
+      setServiceCatalog(catalogResponse.data);
+    } catch (error) {
+      console.error("Unable to load worker services:", error);
+      setServicesError("Unable to load services. Please try again.");
+    } finally {
+      if (showLoading) {
+        setServicesLoading(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    void loadWorkerServices();
+  }, []);
+
+  const addWorkerService = async () => {
+    const serviceId = Number(selectedServiceId);
+    if (!serviceId || serviceActionLoading !== null) return;
+
+    try {
+      setServiceActionLoading(serviceId);
+      setServicesError("");
+
+      const response = await api.post<ServiceItem[]>(
+        `/workers/me/services/${serviceId}`,
+      );
+
+      setWorkerServices(response.data);
+      setSelectedServiceId("");
+      setShowAddService(false);
+    } catch (error) {
+      console.error("Unable to add worker service:", error);
+      setServicesError("Unable to add this service. Please try again.");
+    } finally {
+      setServiceActionLoading(null);
+    }
+  };
+
+  const removeWorkerService = async (serviceId: number) => {
+    if (serviceActionLoading !== null) return;
+
+    const confirmed = window.confirm(
+      "Are you sure you want to remove this service from your profile?",
+    );
+    if (!confirmed) return;
+
+    try {
+      setServiceActionLoading(serviceId);
+      setServicesError("");
+
+      const response = await api.delete<ServiceItem[]>(
+        `/workers/me/services/${serviceId}`,
+      );
+
+      setWorkerServices(response.data);
+    } catch (error) {
+      console.error("Unable to remove worker service:", error);
+      setServicesError("Unable to remove this service. Please try again.");
+    } finally {
+      setServiceActionLoading(null);
+    }
+  };
+
+  const availableServices = serviceCatalog.filter(
+    (service) => !workerServices.some((assigned) => assigned.id === service.id),
+  );
+
+  const workerName = worker?.name ?? (workerLoading ? "Loading..." : "Worker");
 
   const workerInitials =
     workerName
@@ -283,6 +437,11 @@ function WorkerDashboard() {
       booking.status.toLowerCase().includes(query)
     );
   });
+
+  const visibleBookings =
+    showAllBookings || searchQuery.trim()
+      ? filteredBookings
+      : filteredBookings.slice(0, 5);
 
   const getStatusStyle = (status: BookingStatus) => {
     switch (status) {
@@ -462,15 +621,7 @@ function WorkerDashboard() {
           </div>
 
           <div className="flex items-center gap-3 sm:gap-5">
-            <button
-              className="relative rounded-xl border border-gray-200 p-2.5 text-gray-600 hover:bg-gray-50"
-              aria-label="Notifications"
-            >
-              <Bell size={19} />
-              {pendingBookings > 0 && (
-                <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500" />
-              )}
-            </button>
+            <NotificationBell />
 
             <div className="hidden items-center gap-2 sm:flex">
               <ProfileAvatar size="h-10 w-10" />
@@ -559,18 +710,43 @@ function WorkerDashboard() {
                       ? "Customers can request your services"
                       : "New requests are paused"}
                   </p>
+                  {availabilityUpdating && (
+                    <p className="mt-1 text-xs text-gray-500">Updating availability...</p>
+                  )}
+                  {availabilityError && (
+                    <p className="mt-1 text-xs text-red-600">{availabilityError}</p>
+                  )}
                 </div>
 
                 <button
-                  onClick={() =>
-                    window.alert(
-                      "Availability updates will be connected to the backend in the next phase.",
-                    )
-                  }
+                  onClick={async () => {
+                    if (availabilityUpdating) return;
+
+                    const nextAvailability = !isAvailable;
+                    setAvailabilityUpdating(true);
+                    setAvailabilityError("");
+
+                    try {
+                      const response = await api.patch<Worker>(
+                        "/workers/me/availability",
+                        { available: nextAvailability },
+                      );
+                      setWorker(response.data);
+                      setIsAvailable(response.data.available);
+                    } catch (error) {
+                      console.error("Unable to update availability:", error);
+                      setAvailabilityError(
+                        "Could not update availability. Please try again.",
+                      );
+                    } finally {
+                      setAvailabilityUpdating(false);
+                    }
+                  }}
+                  disabled={availabilityUpdating || workerLoading || !worker}
                   role="switch"
                   aria-checked={isAvailable}
                   aria-label="Worker availability"
-                  className={`relative h-7 w-12 rounded-full transition ${
+                  className={`relative h-7 w-12 rounded-full transition disabled:cursor-not-allowed disabled:opacity-60 ${
                     isAvailable ? "bg-emerald-600" : "bg-gray-300"
                   }`}
                 >
@@ -799,7 +975,7 @@ function WorkerDashboard() {
                   </thead>
 
                   <tbody className="divide-y divide-gray-100">
-                    {filteredBookings.map((booking) => (
+                    {visibleBookings.map((booking) => (
                       <tr
                         key={booking.id}
                         className="transition hover:bg-gray-50/70"
@@ -856,6 +1032,14 @@ function WorkerDashboard() {
                         </td>
 
                         <td className="px-5 py-5">
+                          <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void openBookingDetails(booking.id)}
+                            className="whitespace-nowrap rounded-lg border border-emerald-200 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
+                          >
+                            Details
+                          </button>
                           {booking.status === "PENDING" ? (
                             <div className="flex items-center gap-2">
                               <button
@@ -896,6 +1080,7 @@ function WorkerDashboard() {
                           ) : (
                             <span className="text-xs text-gray-400">—</span>
                           )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -918,9 +1103,22 @@ function WorkerDashboard() {
               </div>
             </div>
 
+            {!searchQuery.trim() && filteredBookings.length > 5 && (
+              <div className="mt-4 flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => setShowAllBookings((current) => !current)}
+                  className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 px-5 py-2.5 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50"
+                >
+                  {showAllBookings ? "Show less" : `View all ${filteredBookings.length} bookings`}
+                  <ChevronDown size={16} className={showAllBookings ? "rotate-180" : ""} />
+                </button>
+              </div>
+            )}
+
             {bookingsError && (
               <p role="alert" className="mt-3 text-sm text-red-600">
-                {bookingsError} <button className="font-semibold underline" onClick={() => void loadBookings()}>Retry</button>
+                {bookingsError} <button className="font-semibold underline" onClick={() => window.location.reload()}>Retry</button>
               </p>
             )}
             <p className="mt-3 text-xs text-gray-400">
@@ -939,69 +1137,154 @@ function WorkerDashboard() {
                   My Services
                 </h2>
                 <p className="mt-1 text-sm text-gray-500">
-                  Services customers can request from you.
+                  Manage the services customers can request from you.
                 </p>
               </div>
 
-              <button
-                onClick={() =>
-                  window.alert(
-                    "Service management will be connected to the backend in a later phase.",
-                  )
-                }
-                className="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
-              >
-                + Add Service
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => void loadWorkerServices()}
+                  disabled={servicesLoading}
+                  className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
+                >
+                  <RefreshCw size={16} className={servicesLoading ? "animate-spin" : ""} />
+                  Refresh
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAddService((current) => !current)}
+                  disabled={servicesLoading || availableServices.length === 0}
+                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Plus size={17} />
+                  Add Service
+                </button>
+              </div>
             </div>
 
-            <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-              {services.map((service) => {
-                const Icon = service.icon;
+            {servicesError && (
+              <div role="alert" className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                <span>{servicesError}</span>
+                <button
+                  type="button"
+                  onClick={() => void loadWorkerServices()}
+                  className="font-semibold underline"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
 
-                return (
+            {showAddService && (
+              <div className="mt-5 rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
+                <h3 className="font-bold text-gray-900">Add a service to your profile</h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  Choose a service from the LocalWorker service catalog.
+                </p>
+                <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                  <select
+                    value={selectedServiceId}
+                    onChange={(event) => setSelectedServiceId(event.target.value)}
+                    className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                  >
+                    <option value="">Select a service</option>
+                    {availableServices.map((service) => (
+                      <option key={service.id} value={service.id}>
+                        {service.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => void addWorkerService()}
+                    disabled={!selectedServiceId || serviceActionLoading !== null}
+                    className="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {serviceActionLoading !== null ? "Adding..." : "Confirm Add"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAddService(false);
+                      setSelectedServiceId("");
+                    }}
+                    className="rounded-xl border border-gray-200 px-5 py-3 text-sm font-semibold text-gray-600 transition hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+                {availableServices.length === 0 && (
+                  <p className="mt-3 text-sm text-gray-500">
+                    You have already added every service in the catalog.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {servicesLoading ? (
+              <div className="mt-6 rounded-2xl border border-gray-100 bg-white p-10 text-center text-sm text-gray-500">
+                Loading your services...
+              </div>
+            ) : workerServices.length === 0 ? (
+              <div className="mt-6 rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center">
+                <BriefcaseBusiness size={34} className="mx-auto text-gray-300" />
+                <h3 className="mt-3 font-bold text-gray-900">No services added yet</h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  Add services to your profile so customers can find and request them.
+                </p>
+                {availableServices.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAddService(true)}
+                    className="mt-5 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                  >
+                    Add your first service
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+                {workerServices.map((service) => (
                   <div
-                    key={service.name}
+                    key={service.id}
                     className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
-                        <Icon size={24} />
+                        <Wrench size={24} />
                       </div>
-
                       <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                        Demo
+                        Active
                       </span>
                     </div>
 
                     <h3 className="mt-5 text-lg font-bold text-gray-900">
                       {service.name}
                     </h3>
-
                     <p className="mt-2 min-h-12 text-sm leading-6 text-gray-500">
-                      {service.description}
+                      {service.description || "No description available."}
                     </p>
 
                     <div className="mt-5 flex items-center justify-between border-t border-gray-100 pt-4">
-                      <span className="text-sm font-semibold text-gray-900">
-                        {service.price}
-                      </span>
-
+                      <span className="text-xs text-gray-400">Service ID: {service.id}</span>
                       <button
-                        onClick={() =>
-                          window.alert(
-                            "Editing services will be connected to the backend later.",
-                          )
-                        }
-                        className="text-sm font-semibold text-emerald-700 hover:text-emerald-800"
+                        type="button"
+                        onClick={() => void removeWorkerService(service.id)}
+                        disabled={serviceActionLoading !== null}
+                        className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        Edit
+                        <Trash2 size={15} />
+                        {serviceActionLoading === service.id ? "Removing..." : "Remove"}
                       </button>
                     </div>
                   </div>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+            )}
+            <p className="mt-4 text-xs text-gray-400">
+              Your assigned services are loaded from the backend service catalog and worker profile.
+            </p>
           </section>
 
           {/* Reviews */}
@@ -1283,6 +1566,29 @@ function WorkerDashboard() {
             </div>
           </section>
 
+          {(bookingDetailsLoading || bookingDetailsError || selectedBooking) && (
+            <div className="fixed inset-0 z-[80] flex items-center justify-center bg-gray-950/50 p-4" onClick={() => { setSelectedBooking(null); setBookingDetailsError(""); }}>
+              <section role="dialog" aria-modal="true" aria-labelledby="worker-booking-details-title" className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+                <div className="flex items-start justify-between gap-4">
+                  <div><p className="text-xs font-bold uppercase tracking-widest text-emerald-600">Booking information</p><h2 id="worker-booking-details-title" className="mt-1 text-2xl font-extrabold text-gray-900">Booking details</h2></div>
+                  <button type="button" onClick={() => { setSelectedBooking(null); setBookingDetailsError(""); }} aria-label="Close details" className="rounded-lg p-2 text-gray-500 hover:bg-gray-100"><X size={20} /></button>
+                </div>
+                {bookingDetailsLoading ? <p className="py-12 text-center text-sm text-gray-500">Loading booking details...</p> :
+                  bookingDetailsError ? <p role="alert" className="mt-6 rounded-xl bg-red-50 p-4 text-sm text-red-700">{bookingDetailsError}</p> :
+                  selectedBooking && <>
+                    <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-gray-50 p-4"><span className="font-bold text-gray-900">Booking #{selectedBooking.id}</span><span className={`rounded-full px-3 py-1 text-xs font-bold ${getStatusStyle(selectedBooking.status)}`}>{getStatusLabel(selectedBooking.status)}</span></div>
+                    <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                      <div><p className="text-xs font-semibold uppercase text-gray-400">Service</p><p className="mt-1 font-semibold text-gray-800">{selectedBooking.serviceName}</p></div>
+                      <div><p className="text-xs font-semibold uppercase text-gray-400">Scheduled</p><p className="mt-1 font-semibold text-gray-800">{formatBookingDate(selectedBooking.scheduledAt)} {formatBookingTime(selectedBooking.scheduledAt)}</p></div>
+                      <div className="sm:col-span-2"><p className="text-xs font-semibold uppercase text-gray-400">Service address</p><p className="mt-1 text-sm text-gray-700">{selectedBooking.address}</p></div>
+                      <div className="sm:col-span-2"><p className="text-xs font-semibold uppercase text-gray-400">Problem description</p><p className="mt-1 whitespace-pre-wrap text-sm text-gray-700">{selectedBooking.problemDescription || "No description provided."}</p></div>
+                    </div>
+                    <div className="mt-6 rounded-2xl border border-emerald-100 p-5"><h3 className="font-bold text-gray-900">Customer information</h3><p className="mt-3 font-semibold text-gray-800">{selectedBooking.customerName || `Customer #${selectedBooking.customerId}`}</p><p className="mt-1 text-sm text-gray-600">{selectedBooking.customerEmail || "Email not available"}</p><p className="mt-1 text-sm text-gray-600">{selectedBooking.customerPhone || "Phone not available"}</p></div>
+                  </>}
+              </section>
+            </div>
+          )}
+
           {/* Footer */}
           <footer className="border-t border-gray-200 py-6 text-center text-sm text-gray-500">
             <p>
@@ -1290,8 +1596,8 @@ function WorkerDashboard() {
               professionals.
             </p>
             <p className="mt-2 text-xs text-gray-400">
-              Worker profile and bookings come from the backend. Services and
-              reviews still use demonstration data.
+              Worker profile, bookings, and assigned services are connected to the backend.
+              Reviews still use demonstration data.
             </p>
           </footer>
         </div>

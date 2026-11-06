@@ -49,24 +49,24 @@ public class SecurityConfig {
                                 SessionCreationPolicy.IF_REQUIRED
                         )
                 )
-                .authorizeHttpRequests(auth -> auth
-                        .anyRequest().permitAll()
+                .authorizeHttpRequests(auth ->
+                        auth.anyRequest().permitAll()
                 )
-                .oauth2Login(oauth -> oauth
-                        .successHandler(googleOAuth2SuccessHandler)
+                .oauth2Login(oauth ->
+                        oauth.successHandler(googleOAuth2SuccessHandler)
                 );
 
         return http.build();
     }
 
-    // Existing JWT-protected REST APIs
+    // JWT-protected REST APIs
     @Bean
     @Order(2)
     public SecurityFilterChain apiSecurityFilterChain(
             HttpSecurity http) throws Exception {
 
         http
-                .cors(cors -> { })
+                .cors(cors -> {})
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(
@@ -75,27 +75,80 @@ public class SecurityConfig {
                 )
                 .authorizeHttpRequests(auth -> auth
 
-                        .requestMatchers("/api/auth/**").permitAll()
+                        // Allow CORS preflight requests
+                        .requestMatchers(HttpMethod.OPTIONS, "/**")
+                        .permitAll()
 
+                        // Authentication
+                        .requestMatchers("/api/auth/**")
+                        .permitAll()
+
+                        // Images
                         .requestMatchers(HttpMethod.GET, "/api/images/**")
                         .permitAll()
 
                         .requestMatchers(HttpMethod.POST, "/api/images/upload/**")
                         .authenticated()
 
+                        // Customer profile
+                        .requestMatchers(HttpMethod.GET, "/api/users/me")
+                        .hasAnyAuthority(
+                                "ROLE_CUSTOMER",
+                                "ROLE_WORKER",
+                                "ROLE_ADMIN"
+                        )
+
+                        .requestMatchers(HttpMethod.PUT, "/api/users/me")
+                        .hasAuthority("ROLE_CUSTOMER")
+
+                        // Other user management APIs are ADMIN-only
                         .requestMatchers("/api/users/**")
-                        .hasRole("ADMIN")
+                        .hasAuthority("ROLE_ADMIN")
+
+                        // Services
+                        .requestMatchers(HttpMethod.GET, "/api/services/**")
+                        .hasAnyAuthority(
+                                "ROLE_CUSTOMER",
+                                "ROLE_WORKER",
+                                "ROLE_ADMIN"
+                        )
 
                         .requestMatchers("/api/services/**")
-                        .hasAnyRole("ADMIN", "WORKER")
+                        .hasAuthority("ROLE_ADMIN")
+
+                        // Worker APIs
+                        .requestMatchers(HttpMethod.GET, "/api/workers/**")
+                        .hasAnyAuthority(
+                                "ROLE_CUSTOMER",
+                                "ROLE_WORKER",
+                                "ROLE_ADMIN"
+                        )
 
                         .requestMatchers("/api/workers/**")
-                        .hasAnyRole("WORKER", "ADMIN")
+                        .hasAnyAuthority(
+                                "ROLE_WORKER",
+                                "ROLE_ADMIN"
+                        )
 
+                        // Booking APIs
                         .requestMatchers("/api/bookings/**")
-                        .hasAnyRole("CUSTOMER", "WORKER", "ADMIN")
+                        .hasAnyAuthority(
+                                "ROLE_CUSTOMER",
+                                "ROLE_WORKER",
+                                "ROLE_ADMIN"
+                        )
 
-                        .anyRequest().authenticated()
+                        // Notification APIs
+                        .requestMatchers("/api/notifications/**")
+                        .hasAnyAuthority(
+                                "ROLE_CUSTOMER",
+                                "ROLE_WORKER",
+                                "ROLE_ADMIN"
+                        )
+
+                        // All remaining endpoints require authentication
+                        .anyRequest()
+                        .authenticated()
                 )
                 .addFilterBefore(
                         jwtAuthenticationFilter,

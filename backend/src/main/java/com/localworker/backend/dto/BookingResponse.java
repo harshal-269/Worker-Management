@@ -16,6 +16,15 @@ public class BookingResponse {
 
     private String serviceName;
 
+    private String customerName;
+    private String customerEmail;
+    private String customerPhone;
+    private String workerName;
+    private String workerEmail;
+    private String workerPhone;
+    private String workerLocation;
+    private Integer workerExperience;
+
     private LocalDateTime scheduledAt;
 
     private String address;
@@ -66,6 +75,30 @@ public class BookingResponse {
     public void setServiceName(String serviceName) {
         this.serviceName = serviceName;
     }
+
+    public String getCustomerName() { return customerName; }
+    public void setCustomerName(String customerName) { this.customerName = customerName; }
+
+    public String getCustomerEmail() { return customerEmail; }
+    public void setCustomerEmail(String customerEmail) { this.customerEmail = customerEmail; }
+
+    public String getCustomerPhone() { return customerPhone; }
+    public void setCustomerPhone(String customerPhone) { this.customerPhone = customerPhone; }
+
+    public String getWorkerName() { return workerName; }
+    public void setWorkerName(String workerName) { this.workerName = workerName; }
+
+    public String getWorkerEmail() { return workerEmail; }
+    public void setWorkerEmail(String workerEmail) { this.workerEmail = workerEmail; }
+
+    public String getWorkerPhone() { return workerPhone; }
+    public void setWorkerPhone(String workerPhone) { this.workerPhone = workerPhone; }
+
+    public String getWorkerLocation() { return workerLocation; }
+    public void setWorkerLocation(String workerLocation) { this.workerLocation = workerLocation; }
+
+    public Integer getWorkerExperience() { return workerExperience; }
+    public void setWorkerExperience(Integer workerExperience) { this.workerExperience = workerExperience; }
 
     public LocalDateTime getScheduledAt() {
         return scheduledAt;

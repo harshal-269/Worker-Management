@@ -104,10 +104,16 @@ public class OAuthLoginCodeService {
                 loginCode.role()
         );
 
+        User user = userRepository.findByEmailIgnoreCase(loginCode.email())
+                .orElseThrow(() ->
+                        new IllegalArgumentException("OAuth user account not found."));
+
         return new LoginResponse(
                 token,
                 "Google login successful",
-                loginCode.role().name()
+                user.getRole().name(),
+                user.getEmail(),
+                user.getName()
         );
     }
 

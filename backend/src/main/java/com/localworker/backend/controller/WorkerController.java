@@ -1,13 +1,21 @@
 package com.localworker.backend.controller;
 
 import com.localworker.backend.dto.WorkerResponseDTO;
+import com.localworker.backend.dto.WorkerAvailabilityRequest;
 import com.localworker.backend.model.Worker;
 import com.localworker.backend.service.WorkerService;
 
+import com.localworker.backend.model.Service;
+
 import jakarta.validation.constraints.Min;
+
 import org.springframework.data.domain.Page;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 
 import java.util.List;
 import java.util.Set;
@@ -23,25 +31,100 @@ public class WorkerController {
         this.workerService = workerService;
     }
 
-    // Create worker
     @PostMapping
     public Worker createWorker(@RequestBody Worker worker) {
         return workerService.createWorker(worker);
     }
 
-    // Get all workers
     @GetMapping
     public List<WorkerResponseDTO> getAllWorkers() {
         return workerService.getAllWorkers();
     }
 
-    // Get worker by ID
+    // Must be declared before /{id}.
+    @GetMapping("/me")
+    public WorkerResponseDTO getCurrentWorker() {
+
+        Authentication authentication =
+                SecurityContextHolder.getContext().getAuthentication();
+
+        if (authentication == null
+                || !authentication.isAuthenticated()
+                || authentication.getName() == null
+                || authentication.getName().equals("anonymousUser")) {
+
+            throw new AccessDeniedException(
+                    "Authentication is required");
+        }
+
+        return workerService.getCurrentWorker(
+                authentication.getName()
+        );
+    }
+
+    @PatchMapping("/me/availability")
+    public WorkerResponseDTO updateCurrentWorkerAvailability(
+            @Valid @RequestBody WorkerAvailabilityRequest request) {
+
+        Authentication authentication =
+                SecurityContextHolder.getContext().getAuthentication();
+
+        if (authentication == null
+                || !authentication.isAuthenticated()
+                || authentication.getName() == null
+                || authentication.getName().equals("anonymousUser")) {
+            throw new AccessDeniedException("Authentication is required");
+        }
+
+        return workerService.updateCurrentWorkerAvailability(
+                authentication.getName(),
+                request.available()
+        );
+    }
+
+
+    @GetMapping("/me/services")
+    public Set<Service> getMyServices() {
+
+        Authentication authentication =
+                SecurityContextHolder.getContext().getAuthentication();
+
+        return workerService.getCurrentWorkerServices(
+                authentication.getName()
+        );
+    }
+
+    @PostMapping("/me/services/{serviceId}")
+    public Set<Service> addMyService(
+            @PathVariable Long serviceId) {
+
+        Authentication authentication =
+                SecurityContextHolder.getContext().getAuthentication();
+
+        return workerService.addServiceToCurrentWorker(
+                authentication.getName(),
+                serviceId
+        );
+    }
+
+    @DeleteMapping("/me/services/{serviceId}")
+    public Set<Service> removeMyService(
+            @PathVariable Long serviceId) {
+
+        Authentication authentication =
+                SecurityContextHolder.getContext().getAuthentication();
+
+        return workerService.removeServiceFromCurrentWorker(
+                authentication.getName(),
+                serviceId
+        );
+    }
+
     @GetMapping("/{id}")
     public WorkerResponseDTO getWorkerById(@PathVariable Long id) {
         return workerService.getWorkerById(id);
     }
 
-    // Update worker
     @PutMapping("/{id}")
     public Worker updateWorker(
             @PathVariable Long id,
@@ -50,14 +133,12 @@ public class WorkerController {
         return workerService.updateWorker(id, worker);
     }
 
-    // Delete worker
     @DeleteMapping("/{id}")
     public String deleteWorker(@PathVariable Long id) {
         workerService.deleteWorker(id);
         return "Worker deleted successfully";
     }
 
-    // Add services to a worker
     @PutMapping("/{workerId}/services")
     public Worker addServicesToWorker(
             @PathVariable Long workerId,
@@ -69,7 +150,6 @@ public class WorkerController {
         );
     }
 
-    // Search workers by name
     @GetMapping("/search")
     public Page<WorkerResponseDTO> searchWorkers(
             @RequestParam String name,
@@ -79,15 +159,9 @@ public class WorkerController {
             @RequestParam(defaultValue = "ASC") String direction) {
 
         return workerService.searchWorkersByName(
-                name,
-                page,
-                size,
-                sortBy,
-                direction
-        );
+                name, page, size, sortBy, direction);
     }
 
-    // Filter workers by location
     @GetMapping("/filter/location")
     public Page<WorkerResponseDTO> filterByLocation(
             @RequestParam String location,
@@ -97,15 +171,9 @@ public class WorkerController {
             @RequestParam(defaultValue = "ASC") String direction) {
 
         return workerService.filterWorkersByLocation(
-                location,
-                page,
-                size,
-                sortBy,
-                direction
-        );
+                location, page, size, sortBy, direction);
     }
 
-    // Filter workers by minimum experience
     @GetMapping("/filter/experience")
     public Page<WorkerResponseDTO> filterByExperience(
             @RequestParam int minExperience,
@@ -115,15 +183,9 @@ public class WorkerController {
             @RequestParam(defaultValue = "DESC") String direction) {
 
         return workerService.filterWorkersByExperience(
-                minExperience,
-                page,
-                size,
-                sortBy,
-                direction
-        );
+                minExperience, page, size, sortBy, direction);
     }
 
-    // Filter workers by availability
     @GetMapping("/filter/availability")
     public Page<WorkerResponseDTO> filterByAvailability(
             @RequestParam boolean available,
@@ -133,11 +195,6 @@ public class WorkerController {
             @RequestParam(defaultValue = "ASC") String direction) {
 
         return workerService.filterWorkersByAvailability(
-                available,
-                page,
-                size,
-                sortBy,
-                direction
-        );
+                available, page, size, sortBy, direction);
     }
 }

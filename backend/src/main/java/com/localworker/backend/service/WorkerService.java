@@ -1,6 +1,7 @@
 package com.localworker.backend.service;
 
 import com.localworker.backend.dto.WorkerResponseDTO;
+import com.localworker.backend.dto.ServiceResponseDTO;
 import com.localworker.backend.model.Service;
 import com.localworker.backend.model.Worker;
 import com.localworker.backend.repository.ServiceRepository;
@@ -10,7 +11,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashSet;
@@ -31,12 +31,10 @@ public class WorkerService {
         this.serviceRepository = serviceRepository;
     }
 
-    // Create worker
     public Worker createWorker(Worker worker) {
         return workerRepository.save(worker);
     }
 
-    // Get all workers as DTOs
     @Transactional(readOnly = true)
     public List<WorkerResponseDTO> getAllWorkers() {
         return workerRepository.findAll()
@@ -45,7 +43,6 @@ public class WorkerService {
                 .toList();
     }
 
-    // Get worker by ID as DTO
     @Transactional(readOnly = true)
     public WorkerResponseDTO getWorkerById(Long id) {
 
@@ -56,7 +53,17 @@ public class WorkerService {
         return convertToDTO(worker);
     }
 
-    // Update worker
+    @Transactional(readOnly = true)
+    public WorkerResponseDTO getCurrentWorker(String email) {
+
+        Worker worker = workerRepository.findByUser_Email(email)
+                .orElseThrow(() ->
+                        new RuntimeException(
+                                "Worker profile not found for logged-in user"));
+
+        return convertToDTO(worker);
+    }
+
     public Worker updateWorker(Long id, Worker updatedWorker) {
 
         Worker existingWorker = workerRepository.findById(id)
@@ -70,13 +77,26 @@ public class WorkerService {
         existingWorker.setUser(updatedWorker.getUser());
         existingWorker.setServices(updatedWorker.getServices());
 
-        // Preserve the existing profile image during ordinary updates.
-        // Profile images should be changed through the image upload API.
-
         return workerRepository.save(existingWorker);
     }
 
-    // Delete worker
+    @Transactional
+    public WorkerResponseDTO updateCurrentWorkerAvailability(
+            String email,
+            boolean available) {
+
+        Worker worker = workerRepository.findByUser_Email(email)
+                .orElseThrow(() ->
+                        new RuntimeException(
+                                "Worker profile not found for logged-in user"));
+
+        worker.setAvailable(available);
+
+        Worker savedWorker = workerRepository.save(worker);
+
+        return convertToDTO(savedWorker);
+    }
+
     public void deleteWorker(Long id) {
 
         Worker existingWorker = workerRepository.findById(id)
@@ -86,8 +106,9 @@ public class WorkerService {
         workerRepository.delete(existingWorker);
     }
 
-    // Add services to a worker
-    public Worker addServicesToWorker(Long workerId, Set<Long> serviceIds) {
+    public Worker addServicesToWorker(
+            Long workerId,
+            Set<Long> serviceIds) {
 
         Worker worker = workerRepository.findById(workerId)
                 .orElseThrow(() ->
@@ -102,7 +123,56 @@ public class WorkerService {
         return workerRepository.save(worker);
     }
 
-    // Search workers by name with pagination and sorting
+    @Transactional(readOnly = true)
+    public Set<Service> getCurrentWorkerServices(String email) {
+
+        Worker worker = workerRepository.findByUser_Email(email)
+                .orElseThrow(() ->
+                        new RuntimeException("Worker profile not found"));
+
+        return worker.getServices();
+    }
+
+    @Transactional
+    public Set<Service> addServiceToCurrentWorker(
+            String email,
+            Long serviceId) {
+
+        Worker worker = workerRepository.findByUser_Email(email)
+                .orElseThrow(() ->
+                        new RuntimeException("Worker profile not found"));
+
+        Service service = serviceRepository.findById(serviceId)
+                .orElseThrow(() ->
+                        new RuntimeException("Service not found"));
+
+        worker.getServices().add(service);
+
+        workerRepository.save(worker);
+
+        return worker.getServices();
+    }
+
+    @Transactional
+    public Set<Service> removeServiceFromCurrentWorker(
+            String email,
+            Long serviceId) {
+
+        Worker worker = workerRepository.findByUser_Email(email)
+                .orElseThrow(() ->
+                        new RuntimeException("Worker profile not found"));
+
+        Service service = serviceRepository.findById(serviceId)
+                .orElseThrow(() ->
+                        new RuntimeException("Service not found"));
+
+        worker.getServices().remove(service);
+
+        workerRepository.save(worker);
+
+        return worker.getServices();
+    }
+
     @Transactional(readOnly = true)
     public Page<WorkerResponseDTO> searchWorkersByName(
             String name,
@@ -113,13 +183,13 @@ public class WorkerService {
 
         validatePagination(page, size);
 
-        Pageable pageable = createPageable(page, size, sortBy, direction);
+        Pageable pageable = createPageable(
+                page, size, sortBy, direction);
 
         return workerRepository.searchByName(name, pageable)
                 .map(this::convertToDTO);
     }
 
-    // Filter workers by location
     @Transactional(readOnly = true)
     public Page<WorkerResponseDTO> filterWorkersByLocation(
             String location,
@@ -130,16 +200,14 @@ public class WorkerService {
 
         validatePagination(page, size);
 
-        Pageable pageable = createPageable(page, size, sortBy, direction);
+        Pageable pageable = createPageable(
+                page, size, sortBy, direction);
 
         return workerRepository.findByLocationContainingIgnoreCase(
-                        location,
-                        pageable
-                )
+                        location, pageable)
                 .map(this::convertToDTO);
     }
 
-    // Filter workers by minimum experience
     @Transactional(readOnly = true)
     public Page<WorkerResponseDTO> filterWorkersByExperience(
             int experience,
@@ -152,20 +220,17 @@ public class WorkerService {
 
         if (experience < 0) {
             throw new IllegalArgumentException(
-                    "Experience cannot be negative"
-            );
+                    "Experience cannot be negative");
         }
 
-        Pageable pageable = createPageable(page, size, sortBy, direction);
+        Pageable pageable = createPageable(
+                page, size, sortBy, direction);
 
         return workerRepository.findByExperienceGreaterThanEqual(
-                        experience,
-                        pageable
-                )
+                        experience, pageable)
                 .map(this::convertToDTO);
     }
 
-    // Filter workers by availability
     @Transactional(readOnly = true)
     public Page<WorkerResponseDTO> filterWorkersByAvailability(
             boolean available,
@@ -176,15 +241,18 @@ public class WorkerService {
 
         validatePagination(page, size);
 
-        Pageable pageable = createPageable(page, size, sortBy, direction);
+        Pageable pageable = createPageable(
+                page, size, sortBy, direction);
 
-        return workerRepository.findByAvailable(available, pageable)
+        return workerRepository.findByAvailable(
+                        available, pageable)
                 .map(this::convertToDTO);
     }
 
-    // Update a worker's profile image
     @Transactional
-    public Worker updateWorkerProfileImage(Long workerId, String filename) {
+    public Worker updateWorkerProfileImage(
+            Long workerId,
+            String filename) {
 
         Worker worker = workerRepository.findById(workerId)
                 .orElseThrow(() ->
@@ -195,7 +263,6 @@ public class WorkerService {
         return workerRepository.save(worker);
     }
 
-    // Convert Worker entity to WorkerResponseDTO
     private WorkerResponseDTO convertToDTO(Worker worker) {
 
         String name = null;
@@ -208,8 +275,18 @@ public class WorkerService {
 
         if (worker.getProfileImage() != null
                 && !worker.getProfileImage().isBlank()) {
+
             imageUrl = "/api/images/" + worker.getProfileImage();
         }
+
+        List<ServiceResponseDTO> services = worker.getServices()
+                .stream()
+                .map(service -> new ServiceResponseDTO(
+                        service.getId(),
+                        service.getName(),
+                        service.getDescription()
+                ))
+                .toList();
 
         return new WorkerResponseDTO(
                 worker.getId(),
@@ -218,11 +295,11 @@ public class WorkerService {
                 worker.getExperience(),
                 worker.getDescription(),
                 worker.isAvailable(),
-                imageUrl
+                imageUrl,
+                services
         );
     }
 
-    // Create pagination and sorting configuration
     private Pageable createPageable(
             int page,
             int size,
@@ -238,8 +315,7 @@ public class WorkerService {
 
         if (!allowedSortFields.contains(sortBy)) {
             throw new IllegalArgumentException(
-                    "Invalid sort field. Allowed fields: id, location, experience, available"
-            );
+                    "Invalid sort field. Allowed fields: id, location, experience, available");
         }
 
         Sort.Direction sortDirection;
@@ -248,8 +324,7 @@ public class WorkerService {
             sortDirection = Sort.Direction.fromString(direction);
         } catch (IllegalArgumentException exception) {
             throw new IllegalArgumentException(
-                    "Invalid sort direction. Use ASC or DESC"
-            );
+                    "Invalid sort direction. Use ASC or DESC");
         }
 
         return PageRequest.of(
@@ -259,25 +334,22 @@ public class WorkerService {
         );
     }
 
-    // Validate pagination inputs
     private void validatePagination(int page, int size) {
 
         if (page < 0) {
             throw new IllegalArgumentException(
-                    "Page number cannot be negative"
-            );
+                    "Page number cannot be negative");
         }
 
         if (size < 1 || size > 100) {
             throw new IllegalArgumentException(
-                    "Page size must be between 1 and 100"
-            );
+                    "Page size must be between 1 and 100");
         }
     }
 
-
     @Transactional(readOnly = true)
     public Worker getWorkerEntityById(Long id) {
+
         return workerRepository.findById(id)
                 .orElseThrow(() ->
                         new RuntimeException("Worker not found"));

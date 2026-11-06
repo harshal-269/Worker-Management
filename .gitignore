@@ -1,37 +1,69 @@
-# IntelliJ
+
+# ==============================
+# Java / Spring Boot
+# ==============================
+HELP.md
+target/
+**/target/
+build/
+**/build/
+
+# Maven wrapper
+.mvn/wrapper/maven-wrapper.jar
+
+# ==============================
+# IDE
+# ==============================
 .idea/
 *.iml
+*.iws
+*.ipr
+.classpath
+.project
+.settings/
+.sts4-cache/
+.vscode/
 
-# Spring Boot
-backend/target/
-
-# React
-frontend/node_modules/
-frontend/dist/
-
-# Environment secrets
-.env
-.env.*
-!.env.example
-**/application-local.properties
-
-# Logs
-*.log
-
-# Sensitive backend configuration
-backend/src/main/resources/application.properties
-backend/src/main/resources/application-local.properties
-
-# Environment variables
-.env
-.env.*
-!.env.example
-
-# Build files
-**/target/
+# ==============================
+# Frontend
+# ==============================
+node_modules/
 **/node_modules/
+dist/
 **/dist/
+dist-ssr/
 
-# User uploaded files
+# ==============================
+# Environment variables / secrets
+# ==============================
+.env
+.env.*
+!.env.example
+
+# Local configuration
+**/application-local.properties
+**/application-secret.properties
+
+# Private keys and certificates
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+
+# ==============================
+# Uploaded files
+# ==============================
 uploads/
 
+# ==============================
+# Logs
+# ==============================
+*.log
+logs/
+
+# ==============================
+# Operating system
+# ==============================
+.DS_Store
+Thumbs.db

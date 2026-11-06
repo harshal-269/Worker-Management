@@ -1,5 +1,8 @@
 package com.localworker.backend.dto;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class WorkerResponseDTO {
 
     private Long id;
@@ -9,6 +12,7 @@ public class WorkerResponseDTO {
     private String description;
     private boolean available;
     private String profileImage;
+    private List<ServiceResponseDTO> services = new ArrayList<>();
 
     public WorkerResponseDTO() {
     }
@@ -20,7 +24,8 @@ public class WorkerResponseDTO {
             int experience,
             String description,
             boolean available,
-            String profileImage
+            String profileImage,
+            List<ServiceResponseDTO> services
     ) {
         this.id = id;
         this.name = name;
@@ -29,6 +34,7 @@ public class WorkerResponseDTO {
         this.description = description;
         this.available = available;
         this.profileImage = profileImage;
+        this.services = services;
     }
 
     public Long getId() {
@@ -85,5 +91,13 @@ public class WorkerResponseDTO {
 
     public void setProfileImage(String profileImage) {
         this.profileImage = profileImage;
+    }
+
+    public List<ServiceResponseDTO> getServices() {
+        return services;
+    }
+
+    public void setServices(List<ServiceResponseDTO> services) {
+        this.services = services;
     }
 }

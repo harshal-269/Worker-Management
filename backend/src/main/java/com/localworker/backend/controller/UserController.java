@@ -1,6 +1,10 @@
 package com.localworker.backend.controller;
 
 import com.localworker.backend.model.User;
+import com.localworker.backend.dto.CustomerProfileDTO;
+import com.localworker.backend.dto.UpdateCustomerProfileRequest;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import com.localworker.backend.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
@@ -15,6 +19,24 @@ public class UserController {
 
     public UserController(UserService userService) {
         this.userService = userService;
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<CustomerProfileDTO> getMyProfile(
+            Authentication authentication) {
+        return ResponseEntity.ok(
+                userService.getCurrentUserProfile(authentication.getName())
+        );
+    }
+
+    @PutMapping("/me")
+    public ResponseEntity<CustomerProfileDTO> updateMyProfile(
+            Authentication authentication,
+            @Valid @RequestBody UpdateCustomerProfileRequest request) {
+        return ResponseEntity.ok(
+                userService.updateCurrentUserProfile(
+                        authentication.getName(), request)
+        );
     }
 
     @PostMapping

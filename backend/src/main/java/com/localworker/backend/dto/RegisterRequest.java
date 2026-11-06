@@ -1,5 +1,7 @@
+
 package com.localworker.backend.dto;
 
+import com.localworker.backend.model.Role;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -7,6 +9,7 @@ import jakarta.validation.constraints.Size;
 public class RegisterRequest {
 
     @NotBlank(message = "Name is required")
+    @Size(min = 2, max = 100, message = "Name must be between 2 and 100 characters")
     private String name;
 
     @NotBlank(message = "Email is required")
@@ -17,8 +20,11 @@ public class RegisterRequest {
     private String phone;
 
     @NotBlank(message = "Password is required")
-    @Size(min = 6, message = "Password must contain at least 6 characters")
+    @Size(min = 8, message = "Password must contain at least 8 characters")
     private String password;
+
+    // CUSTOMER is the default role.
+    private Role role = Role.CUSTOMER;
 
     public RegisterRequest() {
     }
@@ -53,5 +59,13 @@ public class RegisterRequest {
 
     public void setPassword(String password) {
         this.password = password;
+    }
+
+    public Role getRole() {
+        return role;
+    }
+
+    public void setRole(Role role) {
+        this.role = role;
     }
 }

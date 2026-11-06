@@ -7,15 +7,24 @@ interface OAuthExchangeResponse {
   token: string;
   message: string;
   role: string;
+  email?: string;
+  name?: string;
 }
 
 function getEmailFromToken(token: string): string {
   try {
     const payload = token.split(".")[1];
+
+    if (!payload) {
+      return "";
+    }
+
     const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
     const decoded = JSON.parse(atob(base64));
+
     return decoded.sub ?? "";
-  } catch {
+  } catch (error) {
+    console.error("Failed to decode JWT:", error);
     return "";
   }
 }
@@ -24,10 +33,15 @@ function getDashboardPath(role: string): string {
   switch (role) {
     case "ADMIN":
       return "/admin/dashboard";
+
     case "WORKER":
       return "/worker/dashboard";
-    default:
+
+    case "CUSTOMER":
       return "/customer/dashboard";
+
+    default:
+      throw new Error("Unknown user role: " + role);
   }
 }
 
@@ -36,21 +50,27 @@ function OAuthCallback() {
   const hasStarted = useRef(false);
 
   useEffect(() => {
-    if (hasStarted.current) return;
+    if (hasStarted.current) {
+      return;
+    }
+
     hasStarted.current = true;
 
     const exchangeCode = async () => {
       const params = new URLSearchParams(window.location.search);
       const code = params.get("code");
 
-      console.log("Google OAuth callback started.");
+      console.log("========== GOOGLE OAUTH DEBUG ==========");
+      console.log("Current URL:", window.location.href);
       console.log("Authorization code received:", Boolean(code));
 
       if (!code) {
         setError("Google authentication code is missing.");
+        console.error("OAuth authorization code is missing.");
         return;
       }
 
+      // Remove the authorization code from the browser URL.
       window.history.replaceState(
         {},
         document.title,
@@ -65,18 +85,25 @@ function OAuthCallback() {
           { code }
         );
 
-        console.log("OAuth exchange response:", response.data);
+        console.log("OAuth exchange response received.");
 
         const token = response.data?.token;
         const role = response.data?.role;
+        const name = response.data?.name;
+        const responseEmail = response.data?.email;
+
+        console.log("ROLE FROM BACKEND:", role);
 
         if (!token || !role) {
           throw new Error("JWT or user role is missing in API response.");
         }
 
         const normalizedRole = String(role)
+          .trim()
           .toUpperCase()
           .replace(/^ROLE_/, "");
+
+        console.log("NORMALIZED ROLE:", normalizedRole);
 
         if (!["CUSTOMER", "WORKER", "ADMIN"].includes(normalizedRole)) {
           throw new Error("Invalid account role: " + normalizedRole);
@@ -87,18 +114,40 @@ function OAuthCallback() {
         // Save authentication details.
         localStorage.setItem("token", token);
         localStorage.setItem("role", normalizedRole);
-        localStorage.setItem("email", email);
+        localStorage.setItem("email", responseEmail ?? email);
 
-        console.log("Local Storage verification:", {
-          tokenSaved: localStorage.getItem("token") === token,
-          roleSaved: localStorage.getItem("role") === normalizedRole,
-          emailSaved: localStorage.getItem("email") === email
-        });
+        if (name?.trim()) {
+          localStorage.setItem("name", name.trim());
+        } else {
+          localStorage.removeItem("name");
+        }
 
-        console.log("Google login successful. Redirecting...");
+        // Verify saved authentication details.
+        const savedToken = localStorage.getItem("token");
+        const savedRole = localStorage.getItem("role");
+        const savedEmail = localStorage.getItem("email");
+        const savedName = localStorage.getItem("name");
 
-        // Navigate to the correct dashboard.
-        window.location.replace(getDashboardPath(normalizedRole));
+        console.log("ROLE AFTER SAVING:", savedRole);
+        console.log("EMAIL AFTER SAVING:", savedEmail);
+        console.log("NAME AFTER SAVING:", savedName);
+
+        console.log("TOKEN SAVED:", savedToken === token);
+        console.log("ROLE SAVED CORRECTLY:", savedRole === normalizedRole);
+        console.log("EMAIL SAVED:", savedEmail === email);
+
+        if (savedRole !== normalizedRole) {
+          throw new Error("User role could not be saved correctly.");
+        }
+
+        const dashboardPath = getDashboardPath(normalizedRole);
+
+        console.log("DASHBOARD PATH:", dashboardPath);
+        console.log("Google login successful.");
+        console.log("========================================");
+
+        // Navigate to the dashboard based on the authenticated role.
+        window.location.replace(dashboardPath);
 
       } catch (err: unknown) {
         console.error("Google OAuth callback error:", err);
@@ -108,8 +157,8 @@ function OAuthCallback() {
 
           setError(
             err.response?.data?.message ??
-            err.message ??
-            "Google login failed."
+              err.message ??
+              "Google login failed."
           );
         } else if (err instanceof Error) {
           setError(err.message);
@@ -125,6 +174,7 @@ function OAuthCallback() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
       <div className="w-full max-w-md rounded-2xl bg-white p-8 text-center shadow-lg">
+
         {error ? (
           <>
             <h2 className="text-xl font-bold text-red-600">
@@ -157,6 +207,7 @@ function OAuthCallback() {
             </p>
           </>
         )}
+
       </div>
     </div>
   );

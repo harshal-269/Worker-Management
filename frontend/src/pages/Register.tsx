@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -13,20 +14,31 @@ import {
   CheckCircle2,
 } from "lucide-react";
 
+import api from "../api/axios";
+
 function Register() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+
   const [role, setRole] = useState("CUSTOMER");
+
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [error, setError] = useState("");
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (
+    event: React.FormEvent<HTMLFormElement>
+  ) => {
     event.preventDefault();
+
     setError("");
+    setSuccess("");
 
     if (password.length < 8) {
       setError("Password must contain at least 8 characters.");
@@ -43,20 +55,51 @@ function Register() {
       return;
     }
 
-    // Backend integration will be added later.
-    console.log("Registration form submitted", {
-      name,
-      email,
-      phone,
-      role,
-    });
+    try {
+      setLoading(true);
 
-    alert("Registration form is ready. Backend integration is coming next!");
+      const registrationData = {
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        phone,
+        password,
+        role,
+      };
+
+      const response = await api.post(
+        "/auth/register",
+        registrationData
+      );
+
+      setSuccess(
+        response.data.message ||
+          "Registration successful!"
+      );
+
+      setName("");
+      setEmail("");
+      setPhone("");
+      setPassword("");
+      setConfirmPassword("");
+      setRole("CUSTOMER");
+
+    } catch (err: any) {
+      const message =
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        "Registration failed. Please try again.";
+
+      setError(message);
+
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="grid min-h-screen lg:grid-cols-2">
+
         {/* Left panel */}
         <div className="relative hidden overflow-hidden bg-emerald-700 p-12 text-white lg:flex lg:flex-col lg:justify-between xl:p-16">
           <div className="absolute -right-24 -top-24 h-80 w-80 rounded-full bg-emerald-500/40 blur-3xl" />
@@ -66,7 +109,9 @@ function Register() {
               L
             </div>
 
-            <span className="text-2xl font-extrabold">LocalWorker</span>
+            <span className="text-2xl font-extrabold">
+              LocalWorker
+            </span>
           </Link>
 
           <div className="relative max-w-lg">
@@ -88,6 +133,7 @@ function Register() {
             </p>
 
             <div className="mt-10 space-y-4">
+
               <div className="flex items-center gap-4 rounded-2xl border border-white/15 bg-white/10 p-4">
                 <div className="rounded-xl bg-white/10 p-3">
                   <UserRound size={24} />
@@ -113,6 +159,7 @@ function Register() {
                   </p>
                 </div>
               </div>
+
             </div>
           </div>
 
@@ -124,6 +171,7 @@ function Register() {
         {/* Registration form */}
         <div className="flex items-center justify-center px-5 py-10 sm:px-10">
           <div className="w-full max-w-md">
+
             <Link
               to="/"
               className="mb-7 inline-flex items-center gap-2 text-sm font-semibold text-slate-500 transition hover:text-emerald-700"
@@ -158,7 +206,11 @@ function Register() {
               </p>
             </div>
 
-            <form onSubmit={handleSubmit} className="mt-7 space-y-4">
+            <form
+              onSubmit={handleSubmit}
+              className="mt-7 space-y-4"
+            >
+
               {/* Full name */}
               <div>
                 <label
@@ -233,7 +285,9 @@ function Register() {
                     inputMode="numeric"
                     value={phone}
                     onChange={(event) =>
-                      setPhone(event.target.value.replace(/\D/g, "").slice(0, 10))
+                      setPhone(
+                        event.target.value.replace(/\D/g, "").slice(0, 10)
+                      )
                     }
                     placeholder="10-digit mobile number"
                     autoComplete="tel-national"
@@ -259,8 +313,13 @@ function Register() {
                   onChange={(event) => setRole(event.target.value)}
                   className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                 >
-                  <option value="CUSTOMER">Customer — Book services</option>
-                  <option value="WORKER">Worker — Provide services</option>
+                  <option value="CUSTOMER">
+                    Customer — Book services
+                  </option>
+
+                  <option value="WORKER">
+                    Worker — Provide services
+                  </option>
                 </select>
               </div>
 
@@ -294,7 +353,11 @@ function Register() {
                     onClick={() => setShowPassword(!showPassword)}
                     className="text-slate-400 hover:text-slate-700"
                   >
-                    {showPassword ? <EyeOff size={19} /> : <Eye size={19} />}
+                    {showPassword ? (
+                      <EyeOff size={19} />
+                    ) : (
+                      <Eye size={19} />
+                    )}
                   </button>
                 </div>
 
@@ -349,7 +412,7 @@ function Register() {
                 </div>
               </div>
 
-              {/* Validation error */}
+              {/* Error */}
               {error && (
                 <div
                   role="alert"
@@ -359,17 +422,37 @@ function Register() {
                 </div>
               )}
 
+              {/* Success */}
+              {success && (
+                <div
+                  role="status"
+                  className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700"
+                >
+                  {success}
+
+                  <Link
+                    to="/login"
+                    className="ml-2 font-bold underline"
+                  >
+                    Sign in
+                  </Link>
+                </div>
+              )}
+
               {/* Submit */}
               <button
                 type="submit"
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-4 font-bold text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700"
+                disabled={loading}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-4 font-bold text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Create account
+                {loading ? "Creating account..." : "Create account"}
               </button>
+
             </form>
 
             <p className="mt-6 text-center text-sm text-slate-500">
               Already have an account?{" "}
+
               <Link
                 to="/login"
                 className="font-bold text-emerald-700 hover:text-emerald-800"
@@ -377,6 +460,7 @@ function Register() {
                 Sign in
               </Link>
             </p>
+
           </div>
         </div>
       </div>

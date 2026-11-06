@@ -8,8 +8,8 @@ import java.time.LocalDateTime;
 
 public class BookingRequest {
 
-    @NotNull(message = "Customer ID is required")
-    private Long customerId;
+    // Customer identity is derived from the authenticated JWT on the backend.
+    // No customerId is accepted from the frontend.
 
     @NotNull(message = "Worker ID is required")
     private Long workerId;
@@ -28,14 +28,6 @@ public class BookingRequest {
     private String problemDescription;
 
     public BookingRequest() {
-    }
-
-    public Long getCustomerId() {
-        return customerId;
-    }
-
-    public void setCustomerId(Long customerId) {
-        this.customerId = customerId;
     }
 
     public Long getWorkerId() {
