@@ -21,6 +21,17 @@ WORKDIR /app
 
 COPY --from=build /app/target/*.jar app.jar
 
+# Add TiDB CA certificate to Java truststore
+COPY isrgrootx1.pem /tmp/tidb-ca.pem
+
+RUN keytool -importcert \
+    -cacerts \
+    -storepass changeit \
+    -noprompt \
+    -alias tidb-root-ca \
+    -file /tmp/tidb-ca.pem \
+    && rm /tmp/tidb-ca.pem
+
 EXPOSE 8080
 
 ENTRYPOINT ["java", "-jar", "app.jar"]
