@@ -41,10 +41,18 @@ function Login() {
   const [error, setError] = useState("");
 
   // Google OAuth login
-  const handleGoogleLogin = () => {
-    window.location.href =
-      "http://localhost:8080/oauth2/authorization/google";
-  };
+
+const handleGoogleLogin = () => {
+  const apiBaseUrl =
+    import.meta.env.VITE_API_BASE_URL ||
+    "http://localhost:8080/api";
+
+  const backendUrl = apiBaseUrl.replace(/\/api\/?$/, "");
+
+  window.location.href =
+    `${backendUrl}/oauth2/authorization/google`;
+};
+
 
   // Existing email/password login
   const handleSubmit = async (
