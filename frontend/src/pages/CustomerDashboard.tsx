@@ -80,6 +80,7 @@ type ServiceOption = {
   id: number;
   name: string;
   description?: string | null;
+  color?: string;
 };
 
 type CustomerProfile = {
@@ -919,7 +920,9 @@ function CustomerDashboard() {
                     onClick={() => setSelectedService(service.name === selectedService ? "All Services" : service.name)}
                     className={`rounded-2xl border bg-white p-5 text-left transition hover:-translate-y-1 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-40 ${selectedService === service.name ? "border-emerald-500 ring-2 ring-emerald-100" : "border-slate-200"}`}
                   >
-                    <div className={`inline-flex rounded-xl p-3 ${service.color}`}><Icon size={24} /></div>
+                    <div className="inline-flex rounded-xl bg-emerald-50 p-3 text-emerald-600">
+                      <Icon size={24} />
+                    </div>
                     <p className="mt-4 font-bold">{service.name}</p>
                     <p className="mt-1 text-xs text-slate-500">
                       {workers.filter((worker) =>

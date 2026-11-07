@@ -4,10 +4,17 @@ package com.localworker.backend.model;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
 
 @Entity
-@Table(name = "users")
+@Table(
+        name = "users",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_users_email",
+                        columnNames = "email"
+                )
+        }
+)
 public class User {
 
     @Id
@@ -22,11 +29,12 @@ public class User {
     @Column(nullable = false)
     private String email;
 
-    // Google users may not have provided a phone number.
+    // Multiple accounts can share the same phone number.
+    // Google users may not have a phone number.
     @Column(nullable = true)
     private String phone;
 
-    // Google users authenticate through Google, not a local password.
+    // Google users authenticate through Google.
     @Column(nullable = true)
     private String password;
 

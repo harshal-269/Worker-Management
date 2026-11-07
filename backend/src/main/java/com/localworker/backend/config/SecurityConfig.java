@@ -75,7 +75,7 @@ public class SecurityConfig {
                 )
                 .authorizeHttpRequests(auth -> auth
 
-                        // Allow CORS preflight requests
+                        // CORS preflight requests
                         .requestMatchers(HttpMethod.OPTIONS, "/**")
                         .permitAll()
 
@@ -101,7 +101,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/users/me")
                         .hasAuthority("ROLE_CUSTOMER")
 
-                        // Other user management APIs are ADMIN-only
+                        // Other user-management APIs are ADMIN-only
                         .requestMatchers("/api/users/**")
                         .hasAuthority("ROLE_ADMIN")
 
@@ -116,7 +116,29 @@ public class SecurityConfig {
                         .requestMatchers("/api/services/**")
                         .hasAuthority("ROLE_ADMIN")
 
-                        // Worker APIs
+                        // WORKER SELF-SERVICE APIs
+                        // Only workers and admins can access their worker dashboard APIs.
+                        .requestMatchers("/api/workers/me/**")
+                        .hasAnyAuthority("ROLE_WORKER", "ROLE_ADMIN")
+
+                        .requestMatchers(HttpMethod.GET, "/api/workers/me")
+                        .hasAnyAuthority("ROLE_WORKER", "ROLE_ADMIN")
+
+                        // ADMIN-ONLY worker management operations
+                        .requestMatchers(HttpMethod.PUT, "/api/workers/*/services")
+                        .hasAuthority("ROLE_ADMIN")
+
+                        .requestMatchers(HttpMethod.PUT, "/api/workers/*")
+                        .hasAuthority("ROLE_ADMIN")
+
+                        .requestMatchers(HttpMethod.DELETE, "/api/workers/*")
+                        .hasAuthority("ROLE_ADMIN")
+
+                        // Worker profile creation - preserve existing permissions.
+                        .requestMatchers(HttpMethod.POST, "/api/workers")
+                        .hasAnyAuthority("ROLE_WORKER", "ROLE_ADMIN")
+
+                        // Customers can browse and search worker profiles.
                         .requestMatchers(HttpMethod.GET, "/api/workers/**")
                         .hasAnyAuthority(
                                 "ROLE_CUSTOMER",
@@ -124,11 +146,9 @@ public class SecurityConfig {
                                 "ROLE_ADMIN"
                         )
 
+                        // Remaining worker-management operations
                         .requestMatchers("/api/workers/**")
-                        .hasAnyAuthority(
-                                "ROLE_WORKER",
-                                "ROLE_ADMIN"
-                        )
+                        .hasAnyAuthority("ROLE_WORKER", "ROLE_ADMIN")
 
                         // Booking APIs
                         .requestMatchers("/api/bookings/**")

@@ -1,3 +1,4 @@
+
 package com.localworker.backend.service;
 
 import com.localworker.backend.dto.BookingRequest;
@@ -17,6 +18,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -27,27 +29,30 @@ public class BookingService {
     private final UserRepository userRepository;
     private final WorkerRepository workerRepository;
     private final ServiceRepository serviceRepository;
+    private final NotificationService notificationService;
 
     public BookingService(
             BookingRepository bookingRepository,
             UserRepository userRepository,
             WorkerRepository workerRepository,
-            ServiceRepository serviceRepository) {
+            ServiceRepository serviceRepository,
+            NotificationService notificationService) {
 
         this.bookingRepository = bookingRepository;
         this.userRepository = userRepository;
         this.workerRepository = workerRepository;
         this.serviceRepository = serviceRepository;
+        this.notificationService = notificationService;
     }
 
     // Create a booking as the authenticated CUSTOMER
+    @Transactional
     public BookingResponse createBooking(BookingRequest request) {
 
         requireRole(Role.CUSTOMER);
 
         String email = getCurrentUserEmail();
 
-        // Resolve the customer from the authenticated JWT, never from a client-supplied ID.
         User customer = userRepository.findByEmailIgnoreCase(email)
                 .orElseThrow(() ->
                         new RuntimeException("Customer account not found"));
@@ -80,6 +85,16 @@ public class BookingService {
 
         Booking savedBooking = bookingRepository.save(booking);
 
+        // Notify the assigned worker.
+        notificationService.createNotification(
+                worker.getUser(),
+                savedBooking,
+                "New Booking Request",
+                customer.getName() + " has requested your "
+                        + service.getName() + " service.",
+                "BOOKING_CREATED"
+        );
+
         return convertToResponse(savedBooking);
     }
 
@@ -106,6 +121,7 @@ public class BookingService {
     }
 
     // Only the assigned worker or ADMIN can accept a booking
+    @Transactional
     public BookingResponse acceptBooking(Long id) {
 
         Booking booking = getBookingEntity(id);
@@ -119,11 +135,24 @@ public class BookingService {
         );
 
         booking.setStatus(BookingStatus.ACCEPTED);
+        Booking savedBooking = bookingRepository.save(booking);
 
-        return convertToResponse(bookingRepository.save(booking));
+        // Notify the customer.
+        notificationService.createNotification(
+                booking.getCustomer(),
+                savedBooking,
+                "Booking Accepted",
+                booking.getWorker().getUser().getName()
+                        + " has accepted your booking for "
+                        + booking.getService().getName() + " service.",
+                "BOOKING_ACCEPTED"
+        );
+
+        return convertToResponse(savedBooking);
     }
 
     // Only the assigned worker or ADMIN can reject a booking
+    @Transactional
     public BookingResponse rejectBooking(Long id) {
 
         Booking booking = getBookingEntity(id);
@@ -137,11 +166,24 @@ public class BookingService {
         );
 
         booking.setStatus(BookingStatus.REJECTED);
+        Booking savedBooking = bookingRepository.save(booking);
 
-        return convertToResponse(bookingRepository.save(booking));
+        // Notify the customer.
+        notificationService.createNotification(
+                booking.getCustomer(),
+                savedBooking,
+                "Booking Rejected",
+                booking.getWorker().getUser().getName()
+                        + " has rejected your booking for "
+                        + booking.getService().getName() + " service.",
+                "BOOKING_REJECTED"
+        );
+
+        return convertToResponse(savedBooking);
     }
 
     // Only the assigned worker or ADMIN can start a booking
+    @Transactional
     public BookingResponse startBooking(Long id) {
 
         Booking booking = getBookingEntity(id);
@@ -155,11 +197,24 @@ public class BookingService {
         );
 
         booking.setStatus(BookingStatus.IN_PROGRESS);
+        Booking savedBooking = bookingRepository.save(booking);
 
-        return convertToResponse(bookingRepository.save(booking));
+        // Notify the customer.
+        notificationService.createNotification(
+                booking.getCustomer(),
+                savedBooking,
+                "Work Started",
+                booking.getWorker().getUser().getName()
+                        + " has started your "
+                        + booking.getService().getName() + " service.",
+                "BOOKING_STARTED"
+        );
+
+        return convertToResponse(savedBooking);
     }
 
     // Only the assigned worker or ADMIN can complete a booking
+    @Transactional
     public BookingResponse completeBooking(Long id) {
 
         Booking booking = getBookingEntity(id);
@@ -173,11 +228,24 @@ public class BookingService {
         );
 
         booking.setStatus(BookingStatus.COMPLETED);
+        Booking savedBooking = bookingRepository.save(booking);
 
-        return convertToResponse(bookingRepository.save(booking));
+        // Notify the customer.
+        notificationService.createNotification(
+                booking.getCustomer(),
+                savedBooking,
+                "Work Completed",
+                booking.getWorker().getUser().getName()
+                        + " has completed your "
+                        + booking.getService().getName() + " service.",
+                "BOOKING_COMPLETED"
+        );
+
+        return convertToResponse(savedBooking);
     }
 
     // Only the customer who owns the booking or ADMIN can cancel it
+    @Transactional
     public BookingResponse cancelBooking(Long id) {
 
         Booking booking = getBookingEntity(id);
@@ -193,8 +261,20 @@ public class BookingService {
         }
 
         booking.setStatus(BookingStatus.CANCELLED);
+        Booking savedBooking = bookingRepository.save(booking);
 
-        return convertToResponse(bookingRepository.save(booking));
+        // Notify the assigned worker.
+        notificationService.createNotification(
+                booking.getWorker().getUser(),
+                savedBooking,
+                "Booking Cancelled",
+                booking.getCustomer().getName()
+                        + " has cancelled the booking for "
+                        + booking.getService().getName() + " service.",
+                "BOOKING_CANCELLED"
+        );
+
+        return convertToResponse(savedBooking);
     }
 
     // Get the authenticated user's email from the JWT security context

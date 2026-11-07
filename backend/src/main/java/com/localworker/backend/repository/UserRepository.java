@@ -9,14 +9,14 @@ import java.util.Optional;
 
 public interface UserRepository extends JpaRepository<User, Long> {
 
-    // Existing methods used by other services
+    // Email methods
     Optional<User> findByEmail(String email);
 
     List<User> findAllByEmail(String email);
 
     boolean existsByEmail(String email);
 
-    // Case-insensitive methods for Google authentication
+    // Case-insensitive email methods
     Optional<User> findByEmailIgnoreCase(String email);
 
     boolean existsByEmailIgnoreCase(String email);
