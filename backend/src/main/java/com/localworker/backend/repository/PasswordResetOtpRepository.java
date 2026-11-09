@@ -18,11 +18,10 @@ public interface PasswordResetOtpRepository
     Optional<PasswordResetOtp> findByEmailIgnoreCase(String email);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("""
-            SELECT p
-            FROM PasswordResetOtp p
-            WHERE LOWER(p.email) = LOWER(:email)
-            """)
+    @Query(
+            value = "SELECT * FROM password_reset_otps WHERE LOWER(email) = LOWER(:email) FOR UPDATE",
+            nativeQuery = true
+    )
     Optional<PasswordResetOtp> findByEmailForUpdate(
             @Param("email") String email
     );
