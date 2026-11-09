@@ -33,6 +33,14 @@ public class BookingResponse {
 
     private BookingStatus status;
 
+    private String cancellationReason;
+
+    private String rejectionReason;
+
+    private LocalDateTime cancelledAt;
+
+    private LocalDateTime rejectedAt;
+
     public BookingResponse() {
     }
 
@@ -130,5 +138,37 @@ public class BookingResponse {
 
     public void setStatus(BookingStatus status) {
         this.status = status;
+    }
+
+    public String getCancellationReason() {
+        return cancellationReason;
+    }
+
+    public void setCancellationReason(String cancellationReason) {
+        this.cancellationReason = cancellationReason;
+    }
+
+    public String getRejectionReason() {
+        return rejectionReason;
+    }
+
+    public void setRejectionReason(String rejectionReason) {
+        this.rejectionReason = rejectionReason;
+    }
+
+    public LocalDateTime getCancelledAt() {
+        return cancelledAt;
+    }
+
+    public void setCancelledAt(LocalDateTime cancelledAt) {
+        this.cancelledAt = cancelledAt;
+    }
+
+    public LocalDateTime getRejectedAt() {
+        return rejectedAt;
+    }
+
+    public void setRejectedAt(LocalDateTime rejectedAt) {
+        this.rejectedAt = rejectedAt;
     }
 }

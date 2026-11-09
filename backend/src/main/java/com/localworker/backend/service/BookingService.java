@@ -20,6 +20,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @org.springframework.stereotype.Service
@@ -153,7 +154,7 @@ public class BookingService {
 
     // Only the assigned worker or ADMIN can reject a booking
     @Transactional
-    public BookingResponse rejectBooking(Long id) {
+    public BookingResponse rejectBooking(Long id, String reason) {
 
         Booking booking = getBookingEntity(id);
 
@@ -166,6 +167,8 @@ public class BookingService {
         );
 
         booking.setStatus(BookingStatus.REJECTED);
+        booking.setRejectionReason(reason.trim());
+        booking.setRejectedAt(LocalDateTime.now());
         Booking savedBooking = bookingRepository.save(booking);
 
         // Notify the customer.
@@ -175,7 +178,8 @@ public class BookingService {
                 "Booking Rejected",
                 booking.getWorker().getUser().getName()
                         + " has rejected your booking for "
-                        + booking.getService().getName() + " service.",
+                        + booking.getService().getName() + " service. Reason: "
+                        + reason.trim(),
                 "BOOKING_REJECTED"
         );
 
@@ -246,7 +250,7 @@ public class BookingService {
 
     // Only the customer who owns the booking or ADMIN can cancel it
     @Transactional
-    public BookingResponse cancelBooking(Long id) {
+    public BookingResponse cancelBooking(Long id, String reason) {
 
         Booking booking = getBookingEntity(id);
 
@@ -261,6 +265,8 @@ public class BookingService {
         }
 
         booking.setStatus(BookingStatus.CANCELLED);
+        booking.setCancellationReason(reason.trim());
+        booking.setCancelledAt(LocalDateTime.now());
         Booking savedBooking = bookingRepository.save(booking);
 
         // Notify the assigned worker.
@@ -270,7 +276,8 @@ public class BookingService {
                 "Booking Cancelled",
                 booking.getCustomer().getName()
                         + " has cancelled the booking for "
-                        + booking.getService().getName() + " service.",
+                        + booking.getService().getName() + " service. Reason: "
+                        + reason.trim(),
                 "BOOKING_CANCELLED"
         );
 
@@ -464,6 +471,11 @@ public class BookingService {
         response.setStatus(
                 booking.getStatus()
         );
+
+        response.setCancellationReason(booking.getCancellationReason());
+        response.setRejectionReason(booking.getRejectionReason());
+        response.setCancelledAt(booking.getCancelledAt());
+        response.setRejectedAt(booking.getRejectedAt());
 
         return response;
     }

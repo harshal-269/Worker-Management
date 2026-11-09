@@ -73,26 +73,16 @@ interface Booking {
   status: BookingStatus;
 }
 
-const reviews = [
-  {
-    name: "Amit Patil",
-    date: "12 Oct 2026",
-    rating: 5,
-    comment: "Very professional service. The work was completed on time.",
-  },
-  {
-    name: "Sneha Deshmukh",
-    date: "08 Oct 2026",
-    rating: 5,
-    comment: "Excellent work and reasonable pricing. Highly recommended!",
-  },
-  {
-    name: "Rahul Jadhav",
-    date: "02 Oct 2026",
-    rating: 4,
-    comment: "Good experience. The issue was fixed properly.",
-  },
-];
+interface Review {
+  id: number;
+  bookingId: number;
+  customerId: number;
+  workerId: number;
+  workerName: string;
+  rating: number;
+  comment: string;
+  createdAt: string;
+}
 
 const sidebarItems = [
   { label: "Overview", icon: LayoutDashboard, id: "overview" },
@@ -131,6 +121,49 @@ function WorkerDashboard() {
   const [serviceActionLoading, setServiceActionLoading] = useState<number | null>(null);
   const [selectedServiceId, setSelectedServiceId] = useState("");
   const [showAddService, setShowAddService] = useState(false);
+
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(true);
+  const [reviewsError, setReviewsError] = useState("");
+  const [averageRating, setAverageRating] = useState(0);
+  const [reviewCount, setReviewCount] = useState(0);
+
+  useEffect(() => {
+    if (!worker?.id) return;
+
+    let cancelled = false;
+
+    const loadReviews = async () => {
+      setReviewsLoading(true);
+      setReviewsError("");
+      try {
+        const [reviewsResponse, ratingResponse, countResponse] = await Promise.all([
+          api.get<Review[]>(`/reviews/worker/${worker.id}`),
+          api.get<{ averageRating: number }>(`/reviews/worker/${worker.id}/rating`),
+          api.get<{ reviewCount: number }>(`/reviews/worker/${worker.id}/count`),
+        ]);
+
+        if (cancelled) return;
+
+        setReviews(reviewsResponse.data ?? []);
+        setAverageRating(Number(ratingResponse.data?.averageRating ?? 0));
+        setReviewCount(Number(countResponse.data?.reviewCount ?? 0));
+      } catch (error) {
+        console.error("Unable to load customer reviews:", error);
+        if (!cancelled) {
+          setReviewsError("Unable to load customer reviews. Please refresh and try again.");
+        }
+      } finally {
+        if (!cancelled) setReviewsLoading(false);
+      }
+    };
+
+    void loadReviews();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [worker?.id]);
 
   const openBookingDetails = async (bookingId: number) => {
     setBookingDetailsLoading(true);
@@ -1299,63 +1332,112 @@ useEffect(() => {
                 Customer Reviews
               </h2>
               <p className="mt-1 text-sm text-gray-500">
-                See what customers say about your services.
+                Real feedback submitted by customers after completed bookings.
               </p>
             </div>
 
-            <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-3">
-              {reviews.map((review) => (
-                <div
-                  key={review.name}
-                  className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-100 font-bold text-emerald-700">
-                        {review.name
-                          .split(" ")
-                          .map((part) => part[0])
-                          .join("")}
-                      </div>
-
-                      <div>
-                        <p className="font-semibold text-gray-900">
-                          {review.name}
-                        </p>
-                        <p className="mt-1 text-xs text-gray-400">
-                          {review.date}
-                        </p>
-                      </div>
+            <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2">
+              <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+                <p className="text-sm font-medium text-gray-500">Average rating</p>
+                <div className="mt-3 flex items-center gap-3">
+                  <span className="text-4xl font-extrabold text-gray-900">
+                    {reviewCount > 0 ? averageRating.toFixed(1) : "—"}
+                  </span>
+                  <div>
+                    <div className="flex gap-1">
+                      {Array.from({ length: 5 }, (_, index) => (
+                        <Star
+                          key={index}
+                          size={17}
+                          className={
+                            index < Math.round(averageRating)
+                              ? "fill-amber-400 text-amber-400"
+                              : "text-gray-200"
+                          }
+                        />
+                      ))}
                     </div>
-
-                    <ShieldCheck size={20} className="text-emerald-600" />
+                    <p className="mt-1 text-xs text-gray-500">Based on customer feedback</p>
                   </div>
-
-                  <div className="mt-5 flex gap-1">
-                    {Array.from({ length: 5 }, (_, index) => (
-                      <Star
-                        key={index}
-                        size={16}
-                        className={
-                          index < review.rating
-                            ? "fill-amber-400 text-amber-400"
-                            : "text-gray-200"
-                        }
-                      />
-                    ))}
-                  </div>
-
-                  <p className="mt-4 text-sm leading-6 text-gray-600">
-                    "{review.comment}"
-                  </p>
                 </div>
-              ))}
+              </div>
+              <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+                <p className="text-sm font-medium text-gray-500">Total reviews</p>
+                <p className="mt-3 text-4xl font-extrabold text-gray-900">{reviewCount}</p>
+                <p className="mt-1 text-xs text-gray-500">Reviews received from customers</p>
+              </div>
             </div>
 
-            <p className="mt-3 text-xs text-gray-400">
-              Reviews are demonstration data and are not connected to the
-              backend yet.
-            </p>
+            {reviewsError && (
+              <div role="alert" className="mt-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                {reviewsError}
+              </div>
+            )}
+
+            {reviewsLoading ? (
+              <div className="mt-6 rounded-2xl border border-gray-100 bg-white p-10 text-center text-sm text-gray-500">
+                Loading customer reviews...
+              </div>
+            ) : reviews.length === 0 ? (
+              <div className="mt-6 rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center">
+                <Star size={34} className="mx-auto text-gray-300" />
+                <h3 className="mt-3 font-bold text-gray-900">No reviews yet</h3>
+                <p className="mt-2 text-sm text-gray-500">
+                  Customer reviews will appear here after customers review completed jobs.
+                </p>
+              </div>
+            ) : (
+              <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-2">
+                {reviews.map((review) => (
+                  <article
+                    key={review.id}
+                    className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-100 font-bold text-emerald-700">
+                          {(review.customerId ? `C${review.customerId}` : "C").slice(0, 2)}
+                        </div>
+                        <div>
+                          <p className="font-semibold text-gray-900">
+                            Customer #{review.customerId}
+                          </p>
+                          <p className="mt-1 text-xs text-gray-400">
+                            {new Date(review.createdAt).toLocaleDateString("en-IN", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            })}
+                          </p>
+                        </div>
+                      </div>
+                      <ShieldCheck size={20} className="text-emerald-600" />
+                    </div>
+
+                    <div className="mt-5 flex items-center gap-1">
+                      {Array.from({ length: 5 }, (_, index) => (
+                        <Star
+                          key={index}
+                          size={16}
+                          className={
+                            index < review.rating
+                              ? "fill-amber-400 text-amber-400"
+                              : "text-gray-200"
+                          }
+                        />
+                      ))}
+                      <span className="ml-2 text-xs font-semibold text-gray-500">
+                        {review.rating}/5 · Booking #{review.bookingId}
+                      </span>
+                    </div>
+
+                    <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-gray-600">
+                      {review.comment || "The customer did not leave a written comment."}
+                    </p>
+                  </article>
+                ))}
+              </div>
+            )}
           </section>
 
           {/* Profile */}

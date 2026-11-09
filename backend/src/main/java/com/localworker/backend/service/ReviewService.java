@@ -37,40 +37,55 @@ public class ReviewService {
         this.workerRepository = workerRepository;
     }
 
+
     @Transactional
     public ReviewResponseDTO createReview(ReviewRequestDTO request) {
 
+        // Get authenticated user's email
         String email = getAuthenticatedEmail();
 
-        User customer = userRepository.findAllByEmail(email)
-                .stream()
-                .filter(user -> user.getRole() != null
-                        && user.getRole().toString().equals("CUSTOMER"))
-                .findFirst()
+        // Find the exact authenticated user
+        User customer = userRepository.findByEmailIgnoreCase(email)
                 .orElseThrow(() ->
                         new IllegalStateException("Customer account not found"));
 
+        // Ensure the logged-in user is a CUSTOMER
+        if (customer.getRole() != com.localworker.backend.model.Role.CUSTOMER) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "Only customers can submit reviews");
+        }
+
+        // Find booking
         Booking booking = bookingRepository.findById(request.getBookingId())
                 .orElseThrow(() ->
                         new IllegalArgumentException("Booking not found"));
 
-        if (booking.getCustomer() == null
-                || !booking.getCustomer().getId().equals(customer.getId())) {
+        // Verify booking ownership
+        if (!java.util.Objects.equals(
+                booking.getCustomer().getId(),
+                customer.getId())) {
+
             throw new org.springframework.security.access.AccessDeniedException(
                     "You can only review your own bookings");
         }
 
-        if (booking.getStatus() != com.localworker.backend.model.BookingStatus.COMPLETED) {
+        // Only completed bookings can be reviewed
+        if (booking.getStatus() !=
+                com.localworker.backend.model.BookingStatus.COMPLETED) {
+
             throw new IllegalStateException(
                     "You can review a booking only after it is completed");
         }
 
+        // Prevent duplicate reviews
         if (reviewRepository.existsByBookingIdAndCustomerId(
                 booking.getId(), customer.getId())) {
+
             throw new IllegalStateException(
                     "You have already reviewed this booking");
         }
 
+        // Get assigned worker
         Worker worker = booking.getWorker();
 
         if (worker == null) {
@@ -78,7 +93,9 @@ public class ReviewService {
                     "No worker is assigned to this booking");
         }
 
+        // Create review
         Review review = new Review();
+
         review.setRating(request.getRating());
         review.setComment(request.getComment());
         review.setCustomer(customer);

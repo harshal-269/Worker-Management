@@ -63,6 +63,10 @@ type Booking = {
   address: string;
   problemDescription: string;
   status: BookingStatus;
+  cancellationReason?: string | null;
+  rejectionReason?: string | null;
+  cancelledAt?: string | null;
+  rejectedAt?: string | null;
 };
 
 type Worker = {
@@ -89,6 +93,22 @@ type CustomerProfile = {
   email: string;
   phone: string | null;
   role: string;
+};
+
+type Review = {
+  id: number;
+  bookingId: number;
+  customerId: number;
+  workerId: number;
+  workerName: string;
+  rating: number;
+  comment: string;
+  createdAt: string;
+};
+
+type WorkerRating = {
+  averageRating: number;
+  reviewCount: number;
 };
 
 type BookingForm = {
@@ -128,6 +148,76 @@ const sidebarItems = [
   { label: "Settings", icon: Settings },
 ];
 
+function BookingStatusTimeline({ status }: { status: BookingStatus }) {
+  const steps: { status: BookingStatus; label: string; description: string }[] = [
+    { status: "PENDING", label: "Request placed", description: "Your booking request has been sent." },
+    { status: "ACCEPTED", label: "Accepted", description: "The worker has accepted your request." },
+    { status: "IN_PROGRESS", label: "Work in progress", description: "The service is currently underway." },
+    { status: "COMPLETED", label: "Completed", description: "The service has been completed." },
+  ];
+
+  const currentIndex = steps.findIndex((step) => step.status === status);
+  const isClosed = status === "REJECTED" || status === "CANCELLED";
+
+  return (
+    <div className="mt-6 rounded-2xl border border-slate-200 p-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="font-bold text-slate-900">Booking progress</h3>
+        <span className={`rounded-full px-3 py-1 text-xs font-bold ${statusStyles[status] || statusStyles.PENDING}`}>
+          {formatStatus(status)}
+        </span>
+      </div>
+
+      {isClosed ? (
+        <div className="mt-4 flex items-start gap-3 rounded-xl bg-red-50 p-4">
+          <Ban size={20} className="mt-0.5 shrink-0 text-red-600" />
+          <div>
+            <p className="font-semibold text-red-800">
+              {status === "REJECTED" ? "This booking was rejected." : "This booking was cancelled."}
+            </p>
+            <p className="mt-1 text-sm text-red-700">
+              {status === "REJECTED"
+                ? "The worker could not accept this request. You can choose another available professional."
+                : "This booking is no longer active."}
+            </p>
+          </div>
+        </div>
+      ) : (
+        <ol className="mt-5 space-y-0">
+          {steps.map((step, index) => {
+            const isComplete = index < currentIndex;
+            const isCurrent = index === currentIndex;
+
+            return (
+              <li key={step.status} className="relative flex gap-4 pb-6 last:pb-0">
+                {index < steps.length - 1 && (
+                  <span className={`absolute left-[15px] top-8 h-[calc(100%-8px)] w-0.5 ${
+                    index < currentIndex ? "bg-emerald-500" : "bg-slate-200"
+                  }`} />
+                )}
+                <span className={`relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
+                  isComplete || isCurrent
+                    ? "bg-emerald-600 text-white"
+                    : "border-2 border-slate-200 bg-white text-slate-400"
+                }`}>
+                  {isComplete ? <CheckCircle2 size={17} /> : index + 1}
+                </span>
+                <div className="min-w-0 pt-0.5">
+                  <p className={`font-semibold ${isCurrent ? "text-emerald-700" : isComplete ? "text-slate-800" : "text-slate-400"}`}>
+                    {step.label}
+                    {isCurrent && <span className="ml-2 text-xs font-bold uppercase tracking-wide text-emerald-600">Current</span>}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-500">{step.description}</p>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      )}
+    </div>
+  );
+}
+
 function CustomerDashboard() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [workers, setWorkers] = useState<Worker[]>([]);
@@ -137,6 +227,10 @@ function CustomerDashboard() {
   const [workersLoading, setWorkersLoading] = useState(true);
   const [bookingsError, setBookingsError] = useState("");
   const [showAllBookings, setShowAllBookings] = useState(false);
+  const [bookingStatusFilter, setBookingStatusFilter] = useState("ALL");
+  const [bookingSearch, setBookingSearch] = useState("");
+  const [bookingSortOrder, setBookingSortOrder] = useState("NEWEST");
+  const [bookingGroup, setBookingGroup] = useState("ALL");
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [bookingDetailsLoading, setBookingDetailsLoading] = useState(false);
   const [bookingDetailsError, setBookingDetailsError] = useState("");
@@ -159,6 +253,9 @@ function CustomerDashboard() {
   const [workersError, setWorkersError] = useState("");
 
   const [cancellingBookingId, setCancellingBookingId] = useState<number | null>(null);
+  const [bookingToCancel, setBookingToCancel] = useState<Booking | null>(null);
+  const [cancellationReason, setCancellationReason] = useState("");
+  const [cancellationError, setCancellationError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [location, setLocation] = useState("");
   const [selectedService, setSelectedService] = useState("All Services");
@@ -174,6 +271,20 @@ function CustomerDashboard() {
   const [profileForm, setProfileForm] = useState({ name: "", phone: "" });
   const bookingsRequestInFlight = useRef(false);
 
+  const [myReviews, setMyReviews] = useState<Review[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewsError, setReviewsError] = useState("");
+  const [reviewBooking, setReviewBooking] = useState<Booking | null>(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [workerRatings, setWorkerRatings] = useState<Record<number, WorkerRating>>({});
+
+  const [selectedWorkerProfile, setSelectedWorkerProfile] = useState<Worker | null>(null);
+  const [workerProfileLoading, setWorkerProfileLoading] = useState(false);
+  const [workerProfileError, setWorkerProfileError] = useState("");
+  const [workerProfileReviews, setWorkerProfileReviews] = useState<Review[]>([]);
+
   const [bookingWorker, setBookingWorker] = useState<Worker | null>(null);
   const [bookingSubmitting, setBookingSubmitting] = useState(false);
   const [bookingFormError, setBookingFormError] = useState("");
@@ -186,7 +297,7 @@ function CustomerDashboard() {
   });
 
   const customerName =
-    customerProfile?.name || sessionStorage.getItem("name") || "Customer";
+    customerProfile?.name || localStorage.getItem("name") || "Customer";
 
   const loadCustomerProfile = useCallback(async () => {
     setProfileLoading(true);
@@ -198,8 +309,8 @@ function CustomerDashboard() {
         name: response.data.name ?? "",
         phone: response.data.phone ?? "",
       });
-      sessionStorage.setItem("name", response.data.name);
-      sessionStorage.setItem("email", response.data.email);
+      localStorage.setItem("name", response.data.name);
+      localStorage.setItem("email", response.data.email);
     } catch (error) {
       console.error("Failed to load customer profile:", error);
       setProfileError(
@@ -227,8 +338,8 @@ function CustomerDashboard() {
         name: response.data.name ?? "",
         phone: response.data.phone ?? "",
       });
-      sessionStorage.setItem("name", response.data.name);
-      sessionStorage.setItem("email", response.data.email);
+      localStorage.setItem("name", response.data.name);
+      localStorage.setItem("email", response.data.email);
       setProfileEditing(false);
       setProfileSuccess("Your profile has been updated successfully.");
     } catch (error: any) {
@@ -271,6 +382,62 @@ function CustomerDashboard() {
     }
   }, []);
 
+  const loadMyReviews = useCallback(async () => {
+    const workerIds = [...new Set(bookings.map((booking) => booking.workerId).filter(Boolean))];
+    if (workerIds.length === 0) {
+      setMyReviews([]);
+      return;
+    }
+
+    setReviewsLoading(true);
+    setReviewsError("");
+    try {
+      const responses = await Promise.all(
+        workerIds.map((workerId) =>
+          api.get<Review[]>(`/reviews/worker/${workerId}`),
+        ),
+      );
+      const customerId = customerProfile?.id ?? bookings[0]?.customerId;
+      const ownReviews = responses
+        .flatMap((response) => response.data ?? [])
+        .filter((review) => customerId != null && review.customerId === customerId)
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setMyReviews(ownReviews);
+    } catch (error) {
+      console.error("Failed to load customer reviews:", error);
+      setReviewsError("Could not load your reviews. Please try again.");
+    } finally {
+      setReviewsLoading(false);
+    }
+  }, [bookings, customerProfile?.id]);
+
+  const submitReview = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!reviewBooking || reviewSubmitting) return;
+
+    setReviewSubmitting(true);
+    setReviewsError("");
+    try {
+      await api.post<Review>("/reviews", {
+        bookingId: reviewBooking.id,
+        rating: reviewRating,
+        comment: reviewComment.trim(),
+      });
+      setReviewBooking(null);
+      setReviewRating(5);
+      setReviewComment("");
+      await loadMyReviews();
+    } catch (error: any) {
+      console.error("Failed to submit review:", error);
+      setReviewsError(
+        error?.response?.data?.message ||
+          "Could not submit your review. Make sure this booking is completed and has not already been reviewed.",
+      );
+    } finally {
+      setReviewSubmitting(false);
+    }
+  };
+
   const loadWorkersAndServices = useCallback(async () => {
     setWorkersLoading(true);
     setWorkersError("");
@@ -282,6 +449,24 @@ function CustomerDashboard() {
 
       setWorkers(workersResponse.data);
       setServiceOptions(servicesResponse.data);
+
+      const ratingEntries = await Promise.all(
+        (workersResponse.data ?? []).map(async (worker) => {
+          try {
+            const [ratingResponse, countResponse] = await Promise.all([
+              api.get<{ averageRating: number }>(`/reviews/worker/${worker.id}/rating`),
+              api.get<{ reviewCount: number }>(`/reviews/worker/${worker.id}/count`),
+            ]);
+            return [worker.id, {
+              averageRating: Number(ratingResponse.data?.averageRating ?? 0),
+              reviewCount: Number(countResponse.data?.reviewCount ?? 0),
+            }] as const;
+          } catch {
+            return [worker.id, { averageRating: 0, reviewCount: 0 }] as const;
+          }
+        }),
+      );
+      setWorkerRatings(Object.fromEntries(ratingEntries));
     } catch (error) {
       console.error("Failed to load workers or services:", error);
       setWorkersError(
@@ -310,26 +495,78 @@ function CustomerDashboard() {
     };
   }, [loadBookings, loadWorkersAndServices]);
 
-  const cancelBooking = async (bookingId: number) => {
-    const confirmed = window.confirm("Are you sure you want to cancel this booking?");
-    if (!confirmed) return;
+  useEffect(() => {
+    if (bookings.length > 0) {
+      void loadMyReviews();
+    } else {
+      setMyReviews([]);
+    }
+  }, [bookings, loadMyReviews]);
 
-    setCancellingBookingId(bookingId);
+  const cancelBooking = async () => {
+    if (!bookingToCancel || cancellingBookingId !== null) return;
+
+    const reason = cancellationReason.trim();
+    if (!reason) {
+      setCancellationError("Please enter a reason for cancelling this booking.");
+      return;
+    }
+
+    setCancellingBookingId(bookingToCancel.id);
+    setCancellationError("");
     setBookingsError("");
+
     try {
-      const response = await api.put<Booking>(`/bookings/${bookingId}/cancel`);
-      setBookings((current) =>
-        current.map((booking) => (booking.id === bookingId ? response.data : booking)),
+      const response = await api.put<Booking>(
+        `/bookings/${bookingToCancel.id}/cancel`,
+        { reason },
       );
-    } catch (error) {
+
+      setBookings((current) =>
+        current.map((booking) =>
+          booking.id === bookingToCancel.id ? response.data : booking,
+        ),
+      );
+
+      if (selectedBooking?.id === bookingToCancel.id) {
+        setSelectedBooking(response.data);
+      }
+
+      setBookingToCancel(null);
+      setCancellationReason("");
+    } catch (error: any) {
       console.error("Failed to cancel booking:", error);
-      setBookingsError("Could not cancel this booking. Only pending or accepted bookings can be cancelled.");
+      setCancellationError(
+        error?.response?.data?.message ||
+          "Could not cancel this booking. Only pending or accepted bookings can be cancelled.",
+      );
     } finally {
       setCancellingBookingId(null);
     }
   };
 
+  const openWorkerProfile = async (worker: Worker) => {
+    setSelectedWorkerProfile(worker);
+    setWorkerProfileLoading(true);
+    setWorkerProfileError("");
+    setWorkerProfileReviews([]);
+    try {
+      const [profileResponse, reviewsResponse] = await Promise.all([
+        api.get<Worker>(`/workers/${worker.id}`),
+        api.get<Review[]>(`/reviews/worker/${worker.id}`),
+      ]);
+      setSelectedWorkerProfile(profileResponse.data);
+      setWorkerProfileReviews(reviewsResponse.data ?? []);
+    } catch (error) {
+      console.error("Failed to load worker profile:", error);
+      setWorkerProfileError("Could not load the complete worker profile. Please try again.");
+    } finally {
+      setWorkerProfileLoading(false);
+    }
+  };
+
   const openBookingForm = (worker: Worker) => {
+    setSelectedWorkerProfile(null);
     setBookingWorker(worker);
     setBookingFormError("");
     setBookingFormSuccess("");
@@ -394,7 +631,38 @@ function CustomerDashboard() {
     }
   };
 
-  const visibleBookings = showAllBookings ? bookings : bookings.slice(0, 3);
+  const filteredBookings = useMemo(() => {
+    const terminalStatuses: BookingStatus[] = ["COMPLETED", "REJECTED", "CANCELLED"];
+    const query = bookingSearch.trim().toLowerCase();
+
+    return bookings
+      .filter((booking) => {
+        const matchesStatus =
+          bookingStatusFilter === "ALL" || booking.status === bookingStatusFilter;
+
+        const matchesGroup =
+          bookingGroup === "ALL" ||
+          (bookingGroup === "ACTIVE" && !terminalStatuses.includes(booking.status)) ||
+          (bookingGroup === "PAST" && terminalStatuses.includes(booking.status));
+
+        const matchesSearch =
+          !query ||
+          (booking.workerName || "").toLowerCase().includes(query) ||
+          (booking.serviceName || "").toLowerCase().includes(query) ||
+          String(booking.id).includes(query);
+
+        return matchesStatus && matchesGroup && matchesSearch;
+      })
+      .sort((a, b) => {
+        const dateA = new Date(a.scheduledAt).getTime();
+        const dateB = new Date(b.scheduledAt).getTime();
+        return bookingSortOrder === "OLDEST" ? dateA - dateB : dateB - dateA;
+      });
+  }, [bookings, bookingStatusFilter, bookingSearch, bookingSortOrder, bookingGroup]);
+
+  const visibleBookings = showAllBookings
+    ? filteredBookings
+    : filteredBookings.slice(0, 3);
 
   const pendingBookingsCount = bookings.filter((booking) => booking.status === "PENDING").length;
   const completedBookingsCount = bookings.filter((booking) => booking.status === "COMPLETED").length;
@@ -713,20 +981,48 @@ function CustomerDashboard() {
                 </div>
               )}
             </section>
-          ) : activeSection === "My Reviews" || activeSection === "Settings" ? (
+          ) : activeSection === "My Reviews" ? (
+            <section className="rounded-3xl border border-slate-200 bg-white p-6 sm:p-8">
+              <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
+                <div>
+                  <p className="text-sm font-bold uppercase tracking-wide text-emerald-600">Your feedback</p>
+                  <h2 className="mt-2 text-2xl font-extrabold text-slate-900">My Reviews</h2>
+                  <p className="mt-2 text-sm text-slate-500">Reviews you have submitted for completed bookings.</p>
+                </div>
+                <span className="rounded-full bg-purple-50 px-4 py-2 text-sm font-bold text-purple-700">{myReviews.length} reviews</span>
+              </div>
+              {reviewsError && <p role="alert" className="mt-5 rounded-xl bg-red-50 p-4 text-sm text-red-700">{reviewsError}</p>}
+              {reviewsLoading ? (
+                <p className="py-12 text-center text-sm text-slate-500">Loading your reviews...</p>
+              ) : myReviews.length === 0 ? (
+                <div className="mt-6 rounded-2xl border border-dashed border-slate-300 p-10 text-center">
+                  <Star size={34} className="mx-auto text-slate-300" />
+                  <h3 className="mt-3 font-bold text-slate-800">No reviews yet</h3>
+                  <p className="mt-2 text-sm text-slate-500">After a booking is completed, you can leave a review from My Bookings.</p>
+                </div>
+              ) : (
+                <div className="mt-6 grid gap-4 md:grid-cols-2">
+                  {myReviews.map((review) => (
+                    <article key={review.id} className="rounded-2xl border border-slate-200 p-5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h3 className="font-bold text-slate-900">{review.workerName || `Worker #${review.workerId}`}</h3>
+                          <p className="mt-1 text-xs text-slate-400">Booking #{review.bookingId} · {new Date(review.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p>
+                        </div>
+                        <div className="flex items-center gap-1 text-sm font-bold text-amber-600"><Star size={16} className="fill-amber-400 text-amber-400" /> {review.rating}/5</div>
+                      </div>
+                      <div className="mt-4 flex gap-1">{Array.from({ length: 5 }, (_, index) => <Star key={index} size={16} className={index < review.rating ? "fill-amber-400 text-amber-400" : "text-slate-200"} />)}</div>
+                      <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-600">{review.comment || "No written comment."}</p>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
+          ) : activeSection === "Settings" ? (
             <section className="rounded-3xl border border-slate-200 bg-white p-8">
               <p className="text-sm font-bold uppercase tracking-wide text-emerald-600">Customer workspace</p>
-              <h2 className="mt-2 text-2xl font-extrabold text-slate-900">{activeSection}</h2>
-              <p className="mt-3 text-sm leading-6 text-slate-500">
-                This section has not been connected yet. Your profile and account details are available under My Profile.
-              </p>
-              <button
-                type="button"
-                onClick={() => setActiveSection("My Profile")}
-                className="mt-5 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white hover:bg-emerald-700"
-              >
-                Open My Profile
-              </button>
+              <h2 className="mt-2 text-2xl font-extrabold text-slate-900">Settings</h2>
+              <p className="mt-3 text-sm leading-6 text-slate-500">Account preferences will be available here in a later update.</p>
             </section>
           ) : (
             <>
@@ -763,7 +1059,7 @@ function CustomerDashboard() {
               { title: "Total Bookings", value: String(bookings.length), subtitle: "Your service requests", icon: CalendarDays, color: "bg-blue-50 text-blue-600" },
               { title: "Pending Requests", value: String(pendingBookingsCount), subtitle: "Awaiting confirmation", icon: Clock, color: "bg-amber-50 text-amber-600" },
               { title: "Completed", value: String(completedBookingsCount), subtitle: "Successfully completed", icon: CheckCircle2, color: "bg-emerald-50 text-emerald-600" },
-              { title: "Reviews Given", value: "0", subtitle: "Your feedback", icon: Star, color: "bg-purple-50 text-purple-600" },
+              { title: "Reviews Given", value: String(myReviews.length), subtitle: "Your feedback", icon: Star, color: "bg-purple-50 text-purple-600" },
             ].map((card) => {
               const Icon = card.icon;
               return (
@@ -797,6 +1093,80 @@ function CustomerDashboard() {
               </button>
             </div>
 
+            <div className="mt-6 space-y-4">
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { value: "ALL", label: "All bookings" },
+                  { value: "ACTIVE", label: "Active" },
+                  { value: "PAST", label: "Past" },
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => {
+                      setBookingGroup(option.value);
+                      setShowAllBookings(false);
+                    }}
+                    className={`rounded-xl px-4 py-2 text-sm font-bold transition ${
+                      bookingGroup === option.value
+                        ? "bg-emerald-600 text-white"
+                        : "border border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px_180px]">
+                <div className="flex items-center gap-3 rounded-xl border border-slate-200 px-4">
+                  <Search size={18} className="shrink-0 text-slate-400" />
+                  <input
+                    value={bookingSearch}
+                    onChange={(event) => {
+                      setBookingSearch(event.target.value);
+                      setShowAllBookings(false);
+                    }}
+                    placeholder="Search worker, service or booking ID"
+                    aria-label="Search bookings"
+                    className="w-full py-3 text-sm outline-none"
+                  />
+                </div>
+                <select
+                  value={bookingStatusFilter}
+                  onChange={(event) => {
+                    setBookingStatusFilter(event.target.value);
+                    setShowAllBookings(false);
+                  }}
+                  aria-label="Filter bookings by status"
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none focus:border-emerald-500"
+                >
+                  <option value="ALL">All statuses</option>
+                  <option value="PENDING">Pending</option>
+                  <option value="ACCEPTED">Accepted</option>
+                  <option value="IN_PROGRESS">In progress</option>
+                  <option value="COMPLETED">Completed</option>
+                  <option value="REJECTED">Rejected</option>
+                  <option value="CANCELLED">Cancelled</option>
+                </select>
+                <select
+                  value={bookingSortOrder}
+                  onChange={(event) => {
+                    setBookingSortOrder(event.target.value);
+                    setShowAllBookings(false);
+                  }}
+                  aria-label="Sort bookings by date"
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none focus:border-emerald-500"
+                >
+                  <option value="NEWEST">Newest first</option>
+                  <option value="OLDEST">Oldest first</option>
+                </select>
+              </div>
+              <p className="text-xs text-slate-500">
+                Showing {filteredBookings.length} of {bookings.length} bookings
+              </p>
+            </div>
+
             {bookingsError && (
               <div role="alert" className="mt-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
                 <p>{bookingsError}</p>
@@ -806,12 +1176,20 @@ function CustomerDashboard() {
 
             {bookingsLoading ? (
               <div className="py-12 text-center text-sm text-slate-500">Loading your bookings...</div>
-            ) : bookings.length === 0 ? (
+            ) : filteredBookings.length === 0 ? (
               <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
                 <CalendarDays size={34} className="mx-auto text-slate-400" />
-                <h3 className="mt-3 font-bold text-slate-800">No bookings yet</h3>
-                <p className="mt-2 text-sm text-slate-500">Your service requests will appear here after you book a worker.</p>
-                <button type="button" onClick={() => document.getElementById("find-workers")?.scrollIntoView({ behavior: "smooth" })} className="mt-4 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-700">Find a worker</button>
+                <h3 className="mt-3 font-bold text-slate-800">
+                  {bookings.length === 0 ? "No bookings yet" : "No matching bookings"}
+                </h3>
+                <p className="mt-2 text-sm text-slate-500">
+                  {bookings.length === 0
+                    ? "Your service requests will appear here after you book a worker."
+                    : "Try changing your search or filters to see more bookings."}
+                </p>
+                {bookings.length === 0 && (
+                  <button type="button" onClick={() => document.getElementById("find-workers")?.scrollIntoView({ behavior: "smooth" })} className="mt-4 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-700">Find a worker</button>
+                )}
               </div>
             ) : (
               <div className="mt-6 space-y-4">
@@ -828,7 +1206,11 @@ function CustomerDashboard() {
                       {(booking.status === "PENDING" || booking.status === "ACCEPTED") && (
                         <button
                           type="button"
-                          onClick={() => void cancelBooking(booking.id)}
+                          onClick={() => {
+                            setBookingToCancel(booking);
+                            setCancellationReason("");
+                            setCancellationError("");
+                          }}
                           disabled={cancellingBookingId === booking.id}
                           className="inline-flex items-center justify-center gap-2 self-start rounded-xl border border-red-200 px-4 py-2.5 text-sm font-bold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                         >
@@ -836,7 +1218,14 @@ function CustomerDashboard() {
                         </button>
                       )}
                     </div>
-                    <div className="mt-4 flex justify-end">
+                    <div className="mt-4 flex flex-wrap justify-end gap-2">
+                      {booking.status === "COMPLETED" && (
+                        myReviews.some((review) => review.bookingId === booking.id) ? (
+                          <span className="inline-flex items-center gap-1 rounded-xl bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-700"><CheckCircle2 size={16} /> Reviewed</span>
+                        ) : (
+                          <button type="button" onClick={() => { setReviewBooking(booking); setReviewRating(5); setReviewComment(""); setReviewsError(""); }} className="inline-flex items-center gap-2 rounded-xl bg-amber-50 px-4 py-2 text-sm font-bold text-amber-700 transition hover:bg-amber-100"><Star size={16} /> Write review</button>
+                        )
+                      )}
                       <button type="button" onClick={() => void openBookingDetails(booking.id)} className="rounded-xl border border-emerald-200 px-4 py-2 text-sm font-bold text-emerald-700 transition hover:bg-emerald-50">
                         View details
                       </button>
@@ -854,14 +1243,14 @@ function CustomerDashboard() {
                     {booking.problemDescription && <p className="mt-3 text-sm leading-6 text-slate-600"><span className="font-semibold text-slate-700">Problem: </span>{booking.problemDescription}</p>}
                   </article>
                 ))}
-                {bookings.length > 3 && (
+                {filteredBookings.length > 3 && (
                   <div className="flex justify-center pt-2">
                     <button
                       type="button"
                       onClick={() => setShowAllBookings((current) => !current)}
                       className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 px-5 py-2.5 text-sm font-bold text-emerald-700 transition hover:bg-emerald-50"
                     >
-                      {showAllBookings ? "Show less" : `View all ${bookings.length} bookings`}
+                      {showAllBookings ? "Show less" : `View all ${filteredBookings.length} bookings`}
                       <ArrowRight size={16} className={showAllBookings ? "-rotate-90" : "rotate-90"} />
                     </button>
                   </div>
@@ -980,6 +1369,11 @@ function CustomerDashboard() {
                           <MapPin size={16} /> {worker.location || "Location not provided"}
                         </div>
                         <p className="text-sm text-slate-600"><span className="font-bold">{worker.experience} years</span> of professional experience</p>
+                        <div className="flex items-center gap-2 text-sm">
+                          <Star size={16} className="fill-amber-400 text-amber-400" />
+                          <span className="font-bold text-slate-800">{(workerRatings[worker.id]?.averageRating ?? 0) > 0 ? workerRatings[worker.id].averageRating.toFixed(1) : "New"}</span>
+                          <span className="text-slate-500">({workerRatings[worker.id]?.reviewCount ?? 0} reviews)</span>
+                        </div>
                         <div>
                           <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">Services offered</p>
                           {(worker.services ?? []).length > 0 ? (
@@ -994,16 +1388,19 @@ function CustomerDashboard() {
                             <p className="text-sm text-slate-400">No services added yet</p>
                           )}
                         </div>
-                        <div className="flex items-center justify-between border-t border-slate-100 pt-4">
+                        <div className="flex flex-col gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
                           <span className="text-xs text-slate-400">Worker ID: {worker.id}</span>
-                          <button
-                            type="button"
-                            disabled={!worker.available || (worker.services ?? []).length === 0}
-                            onClick={() => openBookingForm(worker)}
-                            className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
-                          >
-                            Request Booking <ArrowRight size={16} />
-                          </button>
+                          <div className="flex gap-2">
+                            <button type="button" onClick={() => void openWorkerProfile(worker)} className="flex-1 rounded-xl border border-emerald-200 px-3 py-3 text-sm font-bold text-emerald-700 transition hover:bg-emerald-50">View Profile</button>
+                            <button
+                              type="button"
+                              disabled={!worker.available || (worker.services ?? []).length === 0}
+                              onClick={() => openBookingForm(worker)}
+                              className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3 py-3 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+                            >
+                              Book Now <ArrowRight size={16} />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </article>
@@ -1032,6 +1429,80 @@ function CustomerDashboard() {
               </Link>
             </div>
           </section>
+
+          {selectedWorkerProfile && (
+            <div className="fixed inset-0 z-[70] flex items-center justify-center overflow-y-auto bg-slate-950/60 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedWorkerProfile(null); }}>
+              <section role="dialog" aria-modal="true" aria-labelledby="worker-profile-title" className="my-8 max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white shadow-2xl">
+                <div className="relative bg-gradient-to-r from-emerald-700 to-emerald-500 p-6 text-white sm:p-8">
+                  <button type="button" aria-label="Close worker profile" onClick={() => setSelectedWorkerProfile(null)} className="absolute right-4 top-4 rounded-xl bg-white/15 p-2 hover:bg-white/25"><X size={20} /></button>
+                  <div className="flex flex-col items-center gap-4 pr-8 sm:flex-row">
+                    {getProfileImageUrl(selectedWorkerProfile.profileImage) ? <img src={getProfileImageUrl(selectedWorkerProfile.profileImage) || ""} alt={selectedWorkerProfile.name} className="h-24 w-24 rounded-3xl border-4 border-white/30 object-cover" /> : <div className="flex h-24 w-24 items-center justify-center rounded-3xl bg-white/20 text-3xl font-extrabold">{initials(selectedWorkerProfile.name || "Worker")}</div>}
+                    <div className="text-center sm:text-left">
+                      <p className="text-sm font-semibold uppercase tracking-wider text-emerald-100">Professional profile</p>
+                      <h2 id="worker-profile-title" className="mt-1 text-2xl font-extrabold">{selectedWorkerProfile.name}</h2>
+                      <span className={`mt-2 inline-flex rounded-full px-3 py-1 text-xs font-bold ${selectedWorkerProfile.available ? "bg-white text-emerald-700" : "bg-slate-100 text-slate-600"}`}>{selectedWorkerProfile.available ? "Available for bookings" : "Currently unavailable"}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-6 p-6 sm:p-8">
+                  {workerProfileLoading ? <p className="py-8 text-center text-sm text-slate-500">Loading complete profile...</p> : (
+                    <>
+                      {workerProfileError && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{workerProfileError}</p>}
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        <div className="rounded-2xl bg-slate-50 p-4"><MapPin size={18} className="text-emerald-600" /><p className="mt-2 text-xs text-slate-500">Location</p><p className="mt-1 font-bold text-slate-800">{selectedWorkerProfile.location || "Not provided"}</p></div>
+                        <div className="rounded-2xl bg-slate-50 p-4"><BriefcaseBusiness size={18} className="text-emerald-600" /><p className="mt-2 text-xs text-slate-500">Experience</p><p className="mt-1 font-bold text-slate-800">{selectedWorkerProfile.experience} years</p></div>
+                        <div className="rounded-2xl bg-slate-50 p-4"><Star size={18} className="text-amber-500" /><p className="mt-2 text-xs text-slate-500">Customer rating</p><p className="mt-1 font-bold text-slate-800">{(workerRatings[selectedWorkerProfile.id]?.averageRating ?? 0) > 0 ? workerRatings[selectedWorkerProfile.id].averageRating.toFixed(1) : "New"} / 5</p><p className="text-xs text-slate-500">{workerRatings[selectedWorkerProfile.id]?.reviewCount ?? 0} reviews</p></div>
+                      </div>
+                      <div><h3 className="font-extrabold text-slate-900">About</h3><p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-600">{selectedWorkerProfile.description || "This professional has not added a description yet."}</p></div>
+                      <div><h3 className="font-extrabold text-slate-900">Services offered</h3><div className="mt-3 flex flex-wrap gap-2">{(selectedWorkerProfile.services ?? []).length ? selectedWorkerProfile.services.map(service => <span key={service.id} className="rounded-full bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">{service.name}</span>) : <p className="text-sm text-slate-500">No services listed.</p>}</div></div>
+                      <div><div className="flex items-center justify-between"><h3 className="font-extrabold text-slate-900">Customer reviews</h3><span className="text-xs text-slate-500">{workerProfileReviews.length} total</span></div>
+                        {workerProfileReviews.length ? <div className="mt-3 space-y-3">{workerProfileReviews.slice(0, 5).map(review => <article key={review.id} className="rounded-2xl border border-slate-200 p-4"><div className="flex items-center justify-between gap-3"><span className="text-sm font-bold text-slate-800">Booking #{review.bookingId}</span><span className="flex items-center gap-1 text-sm font-bold text-amber-600"><Star size={15} className="fill-amber-400 text-amber-400" />{review.rating}/5</span></div><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-600">{review.comment || "No written comment."}</p><p className="mt-2 text-xs text-slate-400">{new Date(review.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p></article>)}</div> : <p className="mt-3 rounded-xl bg-slate-50 p-4 text-sm text-slate-500">No reviews yet. Be the first to share your experience after a completed booking.</p>}
+                      </div>
+                      <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end"><button type="button" onClick={() => setSelectedWorkerProfile(null)} className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">Close</button><button type="button" disabled={!selectedWorkerProfile.available || !(selectedWorkerProfile.services ?? []).length} onClick={() => openBookingForm(selectedWorkerProfile)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500">Book Now <ArrowRight size={16} /></button></div>
+                    </>
+                  )}
+                </div>
+              </section>
+            </div>
+          )}
+
+          {reviewBooking && (
+            <div className="fixed inset-0 z-[75] flex items-center justify-center overflow-y-auto bg-slate-950/50 p-4">
+              <section role="dialog" aria-modal="true" aria-labelledby="review-form-title" className="my-8 w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl sm:p-8">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-bold uppercase tracking-wide text-amber-600">Share your experience</p>
+                    <h2 id="review-form-title" className="mt-2 text-2xl font-extrabold text-slate-900">Review your service</h2>
+                    <p className="mt-1 text-sm text-slate-500">{reviewBooking.workerName || `Worker #${reviewBooking.workerId}`} · Booking #{reviewBooking.id}</p>
+                  </div>
+                  <button type="button" aria-label="Close review form" onClick={() => setReviewBooking(null)} className="rounded-xl p-2 text-slate-500 hover:bg-slate-100"><X size={20} /></button>
+                </div>
+                {reviewsError && <p role="alert" className="mt-5 rounded-xl bg-red-50 p-3 text-sm text-red-700">{reviewsError}</p>}
+                <form onSubmit={submitReview} className="mt-6 space-y-5">
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-slate-700">Your rating</label>
+                    <div className="flex items-center gap-2">
+                      {Array.from({ length: 5 }, (_, index) => (
+                        <button key={index} type="button" onClick={() => setReviewRating(index + 1)} aria-label={`Rate ${index + 1} stars`} className="rounded-lg p-1 transition hover:scale-110">
+                          <Star size={32} className={index < reviewRating ? "fill-amber-400 text-amber-400" : "text-slate-300"} />
+                        </button>
+                      ))}
+                      <span className="ml-2 text-sm font-bold text-slate-700">{reviewRating}/5</span>
+                    </div>
+                  </div>
+                  <div>
+                    <label htmlFor="review-comment" className="mb-2 block text-sm font-semibold text-slate-700">Comment (optional)</label>
+                    <textarea id="review-comment" rows={4} maxLength={1000} value={reviewComment} onChange={(event) => setReviewComment(event.target.value)} placeholder="Tell others about your experience..." className="w-full resize-y rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-500" />
+                    <p className="mt-1 text-right text-xs text-slate-400">{reviewComment.length}/1000</p>
+                  </div>
+                  <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                    <button type="button" onClick={() => setReviewBooking(null)} className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">Cancel</button>
+                    <button type="submit" disabled={reviewSubmitting} className="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50">{reviewSubmitting ? "Submitting..." : "Submit review"}</button>
+                  </div>
+                </form>
+              </section>
+            </div>
+          )}
 
           {bookingWorker && (
             <div className="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto bg-slate-950/50 p-4">
@@ -1106,6 +1577,28 @@ function CustomerDashboard() {
                       <span className="font-bold text-slate-900">Booking #{selectedBooking.id}</span>
                       <span className={`rounded-full px-3 py-1 text-xs font-bold ${statusStyles[selectedBooking.status] || statusStyles.PENDING}`}>{formatStatus(selectedBooking.status)}</span>
                     </div>
+                    <BookingStatusTimeline status={selectedBooking.status} />
+                    {(selectedBooking.status === "CANCELLED" || selectedBooking.status === "REJECTED") && (
+                      <div className="mt-5 rounded-2xl border border-red-100 bg-red-50 p-4">
+                        <h3 className="font-bold text-red-900">
+                          {selectedBooking.status === "CANCELLED" ? "Cancellation reason" : "Rejection reason"}
+                        </h3>
+                        <p className="mt-2 whitespace-pre-wrap text-sm text-red-800">
+                          {(selectedBooking.status === "CANCELLED"
+                            ? selectedBooking.cancellationReason
+                            : selectedBooking.rejectionReason) || "No reason was provided."}
+                        </p>
+                        {(selectedBooking.cancelledAt || selectedBooking.rejectedAt) && (
+                          <p className="mt-2 text-xs text-red-700">
+                            {formatBookingDate(
+                              (selectedBooking.status === "CANCELLED"
+                                ? selectedBooking.cancelledAt
+                                : selectedBooking.rejectedAt) || "",
+                            )}
+                          </p>
+                        )}
+                      </div>
+                    )}
                     <div className="mt-5 grid gap-4 sm:grid-cols-2">
                       <div><p className="text-xs font-semibold uppercase text-slate-400">Service</p><p className="mt-1 font-semibold text-slate-800">{selectedBooking.serviceName}</p></div>
                       <div><p className="text-xs font-semibold uppercase text-slate-400">Scheduled</p><p className="mt-1 font-semibold text-slate-800">{formatBookingDate(selectedBooking.scheduledAt)}</p></div>
@@ -1121,6 +1614,102 @@ function CustomerDashboard() {
                       {selectedBooking.workerExperience != null && <p className="mt-1 text-sm text-slate-600">{selectedBooking.workerExperience} years experience</p>}
                     </div>
                   </>}
+              </section>
+            </div>
+          )}
+
+          {bookingToCancel && (
+            <div
+              className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/50 p-4"
+              onClick={() => {
+                if (cancellingBookingId === null) {
+                  setBookingToCancel(null);
+                  setCancellationReason("");
+                  setCancellationError("");
+                }
+              }}
+            >
+              <section
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="cancel-booking-title"
+                className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-widest text-red-600">Booking cancellation</p>
+                    <h2 id="cancel-booking-title" className="mt-1 text-xl font-extrabold text-slate-900">
+                      Cancel booking #{bookingToCancel.id}?
+                    </h2>
+                    <p className="mt-2 text-sm text-slate-500">
+                      Please tell the worker why you need to cancel this booking.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    aria-label="Close cancellation dialog"
+                    disabled={cancellingBookingId !== null}
+                    onClick={() => {
+                      setBookingToCancel(null);
+                      setCancellationReason("");
+                      setCancellationError("");
+                    }}
+                    className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 disabled:opacity-50"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <label htmlFor="cancellation-reason" className="mt-5 block text-sm font-semibold text-slate-700">
+                  Reason for cancellation
+                </label>
+                <textarea
+                  id="cancellation-reason"
+                  value={cancellationReason}
+                  onChange={(event) => {
+                    setCancellationReason(event.target.value);
+                    setCancellationError("");
+                  }}
+                  maxLength={1000}
+                  rows={4}
+                  placeholder="Enter your reason..."
+                  className="mt-2 w-full resize-y rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                  disabled={cancellingBookingId !== null}
+                />
+                <div className="mt-1 flex justify-between text-xs text-slate-400">
+                  <span>Required · Maximum 1,000 characters</span>
+                  <span>{cancellationReason.length}/1000</span>
+                </div>
+
+                {cancellationError && (
+                  <p role="alert" className="mt-3 rounded-xl bg-red-50 p-3 text-sm text-red-700">
+                    {cancellationError}
+                  </p>
+                )}
+
+                <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                  <button
+                    type="button"
+                    disabled={cancellingBookingId !== null}
+                    onClick={() => {
+                      setBookingToCancel(null);
+                      setCancellationReason("");
+                      setCancellationError("");
+                    }}
+                    className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    Keep booking
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void cancelBooking()}
+                    disabled={cancellingBookingId !== null || !cancellationReason.trim()}
+                    className="rounded-xl bg-red-600 px-5 py-3 text-sm font-bold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {cancellingBookingId !== null ? "Cancelling..." : "Confirm cancellation"}
+                  </button>
+                </div>
               </section>
             </div>
           )}

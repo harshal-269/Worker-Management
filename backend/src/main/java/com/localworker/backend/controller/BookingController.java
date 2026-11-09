@@ -2,6 +2,7 @@ package com.localworker.backend.controller;
 
 import com.localworker.backend.dto.BookingRequest;
 import com.localworker.backend.dto.BookingResponse;
+import com.localworker.backend.dto.BookingStatusReasonRequest;
 import com.localworker.backend.service.BookingService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
@@ -54,8 +55,11 @@ public class BookingController {
     }
 
     @PutMapping("/{id}/reject")
-    public BookingResponse rejectBooking(@PathVariable Long id) {
-        return bookingService.rejectBooking(id);
+    public BookingResponse rejectBooking(
+            @PathVariable Long id,
+            @Valid @RequestBody BookingStatusReasonRequest request) {
+
+        return bookingService.rejectBooking(id, request.getReason());
     }
 
     @PutMapping("/{id}/start")
@@ -69,7 +73,10 @@ public class BookingController {
     }
 
     @PutMapping("/{id}/cancel")
-    public BookingResponse cancelBooking(@PathVariable Long id) {
-        return bookingService.cancelBooking(id);
+    public BookingResponse cancelBooking(
+            @PathVariable Long id,
+            @Valid @RequestBody BookingStatusReasonRequest request) {
+
+        return bookingService.cancelBooking(id, request.getReason());
     }
 }
