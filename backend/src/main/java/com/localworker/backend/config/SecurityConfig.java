@@ -81,7 +81,12 @@ public class SecurityConfig {
                 )
                 .authorizeHttpRequests(auth -> auth
 
+                        // CORS preflight
                         .requestMatchers(HttpMethod.OPTIONS, "/**")
+                        .permitAll()
+
+                        // Public health check for UptimeRobot
+                        .requestMatchers("/actuator/health")
                         .permitAll()
 
                         // Authentication
@@ -146,6 +151,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/notifications/**")
                         .hasAnyAuthority("ROLE_CUSTOMER", "ROLE_WORKER", "ROLE_ADMIN")
 
+                        // Everything else requires authentication
                         .anyRequest()
                         .authenticated()
                 )
