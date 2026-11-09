@@ -41,18 +41,16 @@ function Login() {
   const [error, setError] = useState("");
 
   // Google OAuth login
+  const handleGoogleLogin = () => {
+    const apiBaseUrl =
+      import.meta.env.VITE_API_BASE_URL ||
+      "http://localhost:8080/api";
 
-const handleGoogleLogin = () => {
-  const apiBaseUrl =
-    import.meta.env.VITE_API_BASE_URL ||
-    "http://localhost:8080/api";
+    const backendUrl = apiBaseUrl.replace(/\/api\/?$/, "");
 
-  const backendUrl = apiBaseUrl.replace(/\/api\/?$/, "");
-
-  window.location.href =
-    `${backendUrl}/oauth2/authorization/google`;
-};
-
+    window.location.href =
+      `${backendUrl}/oauth2/authorization/google`;
+  };
 
   // Existing email/password login
   const handleSubmit = async (
@@ -96,23 +94,25 @@ const handleGoogleLogin = () => {
         throw new Error(`Unrecognized account role: ${normalizedRole}`);
       }
 
-      localStorage.setItem("token", token);
-      localStorage.setItem("role", normalizedRole);
+      // Save authentication details in this browser tab only.
+      sessionStorage.setItem("token", token);
+      sessionStorage.setItem("role", normalizedRole);
+
       const authenticatedEmail =
         data.email ?? user?.email ?? email.trim();
+
       const authenticatedName =
         data.name ?? user?.name ?? "";
 
-      localStorage.setItem("email", authenticatedEmail);
+      sessionStorage.setItem("email", authenticatedEmail);
 
       if (authenticatedName.trim()) {
-        localStorage.setItem("name", authenticatedName.trim());
+        sessionStorage.setItem("name", authenticatedName.trim());
       } else {
-        // Never keep a previous account's name when the current response
-        // does not contain one.
-        localStorage.removeItem("name");
+        sessionStorage.removeItem("name");
       }
 
+      // Navigate according to account role.
       if (normalizedRole === "ADMIN") {
         navigate("/admin/dashboard", { replace: true });
       } else if (normalizedRole === "WORKER") {

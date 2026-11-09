@@ -587,9 +587,11 @@ useEffect(() => {
         <div className="border-t border-gray-100 p-4">
           <button
             onClick={() => {
-              localStorage.removeItem("token");
-              localStorage.removeItem("role");
-              localStorage.removeItem("email");
+              sessionStorage.removeItem("token");
+              sessionStorage.removeItem("role");
+              sessionStorage.removeItem("email");
+              sessionStorage.removeItem("name");
+
               window.location.href = "/login";
             }}
             className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-gray-600 transition hover:bg-red-50 hover:text-red-600"
@@ -1446,7 +1448,7 @@ useEffect(() => {
                       Email Address
                     </div>
                     <p className="mt-2 break-all font-semibold text-gray-900">
-                      {localStorage.getItem("email") ?? "Not available"}
+                      {sessionStorage.getItem("email") ?? "Not available"}
                     </p>
                   </div>
 

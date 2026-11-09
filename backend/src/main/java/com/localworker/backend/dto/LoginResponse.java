@@ -8,6 +8,9 @@ public class LoginResponse {
     private String email;
     private String name;
 
+    private boolean requiresRoleSelection;
+    private String registrationToken;
+
     public LoginResponse() {
     }
 
@@ -26,6 +29,7 @@ public class LoginResponse {
             String role,
             String email,
             String name) {
+
         this.token = token;
         this.message = message;
         this.role = role;
@@ -71,5 +75,21 @@ public class LoginResponse {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public boolean isRequiresRoleSelection() {
+        return requiresRoleSelection;
+    }
+
+    public void setRequiresRoleSelection(boolean requiresRoleSelection) {
+        this.requiresRoleSelection = requiresRoleSelection;
+    }
+
+    public String getRegistrationToken() {
+        return registrationToken;
+    }
+
+    public void setRegistrationToken(String registrationToken) {
+        this.registrationToken = registrationToken;
     }
 }

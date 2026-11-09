@@ -1,4 +1,3 @@
-
 import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
 
 import Home from "./pages/Home";
@@ -6,6 +5,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
 import OAuthCallback from "./pages/OAuthCallback";
+import SelectRole from "./pages/SelectRole";
 
 import CustomerDashboard from "./pages/CustomerDashboard";
 import WorkerDashboard from "./pages/WorkerDashboard";
@@ -44,8 +44,9 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
 
-        {/* Google OAuth callback */}
+        {/* Google OAuth routes */}
         <Route path="/oauth2/callback" element={<OAuthCallback />} />
+        <Route path="/select-role" element={<SelectRole />} />
 
         {/* Dashboards */}
         <Route path="/admin/dashboard" element={<AdminDashboard />} />

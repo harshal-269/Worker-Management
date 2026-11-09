@@ -1,8 +1,7 @@
-
 package com.localworker.backend.security;
 
-import com.localworker.backend.model.User;
 import com.localworker.backend.service.GoogleAuthService;
+import com.localworker.backend.service.GoogleAuthService.GoogleUserResult;
 import com.localworker.backend.service.OAuthLoginCodeService;
 
 import jakarta.servlet.ServletException;
@@ -20,7 +19,8 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 
 @Component
-public class GoogleOAuth2SuccessHandler implements AuthenticationSuccessHandler {
+public class GoogleOAuth2SuccessHandler
+        implements AuthenticationSuccessHandler {
 
     private static final Logger logger =
             LoggerFactory.getLogger(GoogleOAuth2SuccessHandler.class);
@@ -57,22 +57,10 @@ public class GoogleOAuth2SuccessHandler implements AuthenticationSuccessHandler 
                 );
             }
 
-            logger.info("Processing Google user.");
+            GoogleUserResult googleUser =
+                    googleAuthService.processGoogleUser(oauth2User);
 
-            User user = googleAuthService.processGoogleUser(oauth2User);
-
-            if (user == null || user.getId() == null) {
-                throw new IllegalStateException(
-                        "Google authentication returned an invalid user."
-                );
-            }
-
-            logger.info(
-                    "Google user processed successfully. User ID: {}",
-                    user.getId()
-            );
-
-            String code = codeService.createCode(user);
+            String code = codeService.createCode(googleUser);
 
             if (code == null || code.isBlank()) {
                 throw new IllegalStateException(
@@ -80,17 +68,16 @@ public class GoogleOAuth2SuccessHandler implements AuthenticationSuccessHandler 
                 );
             }
 
-            logger.info("One-time OAuth login code generated successfully.");
-
-            String normalizedFrontendUrl = frontendUrl.replaceAll("/+$", "");
+            String normalizedFrontendUrl =
+                    frontendUrl.replaceAll("/+$", "");
 
             String redirectUrl = normalizedFrontendUrl
                     + "/oauth2/callback?code="
                     + code;
 
             logger.info(
-                    "Redirecting Google login to frontend callback: {}",
-                    normalizedFrontendUrl + "/oauth2/callback?code=[REDACTED]"
+                    "Google OAuth processed. Existing account: {}",
+                    googleUser.existingUser()
             );
 
             response.sendRedirect(redirectUrl);

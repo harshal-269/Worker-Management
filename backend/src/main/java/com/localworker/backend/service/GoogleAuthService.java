@@ -1,4 +1,3 @@
-
 package com.localworker.backend.service;
 
 import com.localworker.backend.model.OAuthAccount;
@@ -13,6 +12,7 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.util.Map;
 
 @Service
@@ -32,7 +32,7 @@ public class GoogleAuthService {
     }
 
     @Transactional
-    public User processGoogleUser(OAuth2User oauth2User) {
+    public GoogleUserResult processGoogleUser(OAuth2User oauth2User) {
 
         if (oauth2User == null) {
             throw oauthError("Google user information is missing");
@@ -58,53 +58,69 @@ public class GoogleAuthService {
             throw oauthError("Google email is not verified");
         }
 
-        email = email.trim().toLowerCase(java.util.Locale.ROOT);
+        email = email.trim().toLowerCase(Locale.ROOT);
 
-        // 1. Check existing Google identity.
+        String finalName = name != null && !name.isBlank()
+                ? name.trim()
+                : email.substring(0, email.indexOf("@"));
+
+        // 1. Check whether this Google identity is already linked.
         var existingOAuthAccount =
                 oauthAccountRepository.findByProviderAndProviderUserId(
                         PROVIDER, googleId);
 
         if (existingOAuthAccount.isPresent()) {
-            return existingOAuthAccount.get().getUser();
+
+            User user = existingOAuthAccount.get().getUser();
+
+            if (user.getRole() == null) {
+                throw oauthError("Existing account has no assigned role");
+            }
+
+            return new GoogleUserResult(
+                    true,
+                    googleId,
+                    user.getEmail(),
+                    user.getName(),
+                    user.getRole()
+            );
         }
 
-        // 2. Check whether a LocalWorker account already exists.
+        // 2. Check whether a LocalWorker account already uses this email.
         var existingUser = userRepository.findByEmailIgnoreCase(email);
-
-        User user;
 
         if (existingUser.isPresent()) {
 
-            // Preserve the existing user's role and account details.
-            user = existingUser.get();
+            User user = existingUser.get();
 
-        } else {
+            if (user.getRole() == null) {
+                throw oauthError("Existing account has no assigned role");
+            }
 
-            // 3. Register a new Google customer.
-            user = new User();
+            // Link Google to the existing account without changing its role.
+            OAuthAccount account =
+                    new OAuthAccount(PROVIDER, googleId, user);
 
-            user.setName(
-                    name != null && !name.isBlank()
-                            ? name.trim()
-                            : email.substring(0, email.indexOf("@"))
+            oauthAccountRepository.save(account);
+
+            return new GoogleUserResult(
+                    true,
+                    googleId,
+                    user.getEmail(),
+                    user.getName(),
+                    user.getRole()
             );
-
-            user.setEmail(email);
-            user.setPhone(null);
-            user.setPassword(null);
-            user.setRole(Role.CUSTOMER);
-
-            user = userRepository.save(user);
         }
 
-        // 4. Link the Google identity.
-        OAuthAccount account =
-                new OAuthAccount(PROVIDER, googleId, user);
-
-        oauthAccountRepository.save(account);
-
-        return user;
+        // 3. New Google user: do not create a database account yet.
+        // The user must first select CUSTOMER or WORKER.
+        return new GoogleUserResult(
+                false,
+                googleId,
+                email,
+                finalName,
+                null
+        );
     }
 
     private String getStringAttribute(
@@ -124,5 +140,14 @@ public class GoogleAuthService {
                 new OAuth2Error("google_authentication_error"),
                 message
         );
+    }
+
+    public record GoogleUserResult(
+            boolean existingUser,
+            String googleId,
+            String email,
+            String name,
+            Role role
+    ) {
     }
 }

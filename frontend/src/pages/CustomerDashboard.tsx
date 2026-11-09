@@ -186,7 +186,7 @@ function CustomerDashboard() {
   });
 
   const customerName =
-    customerProfile?.name || localStorage.getItem("name") || "Customer";
+    customerProfile?.name || sessionStorage.getItem("name") || "Customer";
 
   const loadCustomerProfile = useCallback(async () => {
     setProfileLoading(true);
@@ -198,8 +198,8 @@ function CustomerDashboard() {
         name: response.data.name ?? "",
         phone: response.data.phone ?? "",
       });
-      localStorage.setItem("name", response.data.name);
-      localStorage.setItem("email", response.data.email);
+      sessionStorage.setItem("name", response.data.name);
+      sessionStorage.setItem("email", response.data.email);
     } catch (error) {
       console.error("Failed to load customer profile:", error);
       setProfileError(
@@ -227,8 +227,8 @@ function CustomerDashboard() {
         name: response.data.name ?? "",
         phone: response.data.phone ?? "",
       });
-      localStorage.setItem("name", response.data.name);
-      localStorage.setItem("email", response.data.email);
+      sessionStorage.setItem("name", response.data.name);
+      sessionStorage.setItem("email", response.data.email);
       setProfileEditing(false);
       setProfileSuccess("Your profile has been updated successfully.");
     } catch (error: any) {

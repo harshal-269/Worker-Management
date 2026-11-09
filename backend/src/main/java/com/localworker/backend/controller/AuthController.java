@@ -1,9 +1,9 @@
-
 package com.localworker.backend.controller;
 
 import com.localworker.backend.dto.LoginRequest;
 import com.localworker.backend.dto.LoginResponse;
 import com.localworker.backend.dto.OAuthExchangeRequest;
+import com.localworker.backend.dto.GoogleRoleSelectionRequest;
 import com.localworker.backend.dto.SendRegistrationOtpRequest;
 import com.localworker.backend.dto.VerifyRegistrationOtpRequest;
 import com.localworker.backend.dto.ForgotPasswordRequest;
@@ -117,13 +117,27 @@ public class AuthController {
         return ResponseEntity.ok(message);
     }
 
-    // Google OAuth code exchange
+    // Exchange Google OAuth code
     @PostMapping("/oauth/exchange")
     public ResponseEntity<LoginResponse> exchangeGoogleCode(
             @RequestBody OAuthExchangeRequest request) {
 
         LoginResponse response =
                 oauthLoginCodeService.exchangeCode(request.getCode());
+
+        return ResponseEntity.ok(response);
+    }
+
+    // Complete new Google registration after role selection
+    @PostMapping("/oauth/register")
+    public ResponseEntity<LoginResponse> completeGoogleRegistration(
+            @Valid @RequestBody GoogleRoleSelectionRequest request) {
+
+        LoginResponse response =
+                oauthLoginCodeService.completeRegistration(
+                        request.getRegistrationToken(),
+                        request.getRole()
+                );
 
         return ResponseEntity.ok(response);
     }

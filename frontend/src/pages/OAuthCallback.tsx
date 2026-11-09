@@ -1,32 +1,17 @@
 
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import api from "../api/axios";
 
 interface OAuthExchangeResponse {
-  token: string;
-  message: string;
-  role: string;
+  token?: string;
+  message?: string;
+  role?: string;
   email?: string;
   name?: string;
-}
-
-function getEmailFromToken(token: string): string {
-  try {
-    const payload = token.split(".")[1];
-
-    if (!payload) {
-      return "";
-    }
-
-    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
-    const decoded = JSON.parse(atob(base64));
-
-    return decoded.sub ?? "";
-  } catch (error) {
-    console.error("Failed to decode JWT:", error);
-    return "";
-  }
+  requiresRoleSelection?: boolean;
+  registrationToken?: string;
 }
 
 function getDashboardPath(role: string): string {
@@ -46,6 +31,7 @@ function getDashboardPath(role: string): string {
 }
 
 function OAuthCallback() {
+  const navigate = useNavigate();
   const [error, setError] = useState("");
   const hasStarted = useRef(false);
 
@@ -60,42 +46,68 @@ function OAuthCallback() {
       const params = new URLSearchParams(window.location.search);
       const code = params.get("code");
 
-      console.log("========== GOOGLE OAUTH DEBUG ==========");
-      console.log("Current URL:", window.location.href);
-      console.log("Authorization code received:", Boolean(code));
-
-      if (!code) {
-        setError("Google authentication code is missing.");
-        console.error("OAuth authorization code is missing.");
-        return;
-      }
-
-      // Remove the authorization code from the browser URL.
+      // Remove the OAuth code from the browser URL.
       window.history.replaceState(
         {},
         document.title,
-        window.location.pathname
+        window.location.pathname,
       );
 
-      try {
-        console.log("Exchanging authorization code for JWT...");
+      if (!code) {
+        setError("Google authentication code is missing.");
+        return;
+      }
 
+      try {
         const response = await api.post<OAuthExchangeResponse>(
           "/auth/oauth/exchange",
-          { code }
+          { code },
         );
 
-        console.log("OAuth exchange response received.");
+        const data = response.data;
 
-        const token = response.data?.token;
-        const role = response.data?.role;
-        const name = response.data?.name;
-        const responseEmail = response.data?.email;
+        // New Google account: ask the user to select a role.
+        if (data.requiresRoleSelection) {
+          if (!data.registrationToken) {
+            throw new Error(
+              "Registration token is missing from the backend response.",
+            );
+          }
 
-        console.log("ROLE FROM BACKEND:", role);
+          // Clear authentication in this tab only.
+          sessionStorage.removeItem("token");
+          sessionStorage.removeItem("role");
+          sessionStorage.removeItem("email");
+          sessionStorage.removeItem("name");
+
+          // Store temporary Google registration details.
+          sessionStorage.setItem(
+            "googleRegistrationToken",
+            data.registrationToken,
+          );
+
+          sessionStorage.setItem(
+            "googleRegistrationEmail",
+            data.email ?? "",
+          );
+
+          sessionStorage.setItem(
+            "googleRegistrationName",
+            data.name ?? "",
+          );
+
+          navigate("/select-role", { replace: true });
+          return;
+        }
+
+        // Existing Google account: normal login.
+        const token = data.token;
+        const role = data.role;
 
         if (!token || !role) {
-          throw new Error("JWT or user role is missing in API response.");
+          throw new Error(
+            "JWT or user role is missing in API response.",
+          );
         }
 
         const normalizedRole = String(role)
@@ -103,62 +115,32 @@ function OAuthCallback() {
           .toUpperCase()
           .replace(/^ROLE_/, "");
 
-        console.log("NORMALIZED ROLE:", normalizedRole);
-
         if (!["CUSTOMER", "WORKER", "ADMIN"].includes(normalizedRole)) {
           throw new Error("Invalid account role: " + normalizedRole);
         }
 
-        const email = getEmailFromToken(token);
+        // Save authentication details in this browser tab only.
+        sessionStorage.setItem("token", token);
+        sessionStorage.setItem("role", normalizedRole);
+        sessionStorage.setItem("email", data.email ?? "");
 
-        // Save authentication details.
-        localStorage.setItem("token", token);
-        localStorage.setItem("role", normalizedRole);
-        localStorage.setItem("email", responseEmail ?? email);
-
-        if (name?.trim()) {
-          localStorage.setItem("name", name.trim());
+        if (data.name?.trim()) {
+          sessionStorage.setItem("name", data.name.trim());
         } else {
-          localStorage.removeItem("name");
+          sessionStorage.removeItem("name");
         }
 
-        // Verify saved authentication details.
-        const savedToken = localStorage.getItem("token");
-        const savedRole = localStorage.getItem("role");
-        const savedEmail = localStorage.getItem("email");
-        const savedName = localStorage.getItem("name");
-
-        console.log("ROLE AFTER SAVING:", savedRole);
-        console.log("EMAIL AFTER SAVING:", savedEmail);
-        console.log("NAME AFTER SAVING:", savedName);
-
-        console.log("TOKEN SAVED:", savedToken === token);
-        console.log("ROLE SAVED CORRECTLY:", savedRole === normalizedRole);
-        console.log("EMAIL SAVED:", savedEmail === email);
-
-        if (savedRole !== normalizedRole) {
-          throw new Error("User role could not be saved correctly.");
-        }
-
-        const dashboardPath = getDashboardPath(normalizedRole);
-
-        console.log("DASHBOARD PATH:", dashboardPath);
-        console.log("Google login successful.");
-        console.log("========================================");
-
-        // Navigate to the dashboard based on the authenticated role.
-        window.location.replace(dashboardPath);
-
+        navigate(getDashboardPath(normalizedRole), {
+          replace: true,
+        });
       } catch (err: unknown) {
         console.error("Google OAuth callback error:", err);
 
         if (axios.isAxiosError(err)) {
-          console.error("API response:", err.response?.data);
-
           setError(
             err.response?.data?.message ??
               err.message ??
-              "Google login failed."
+              "Google login failed.",
           );
         } else if (err instanceof Error) {
           setError(err.message);
@@ -169,26 +151,21 @@ function OAuthCallback() {
     };
 
     exchangeCode();
-  }, []);
+  }, [navigate]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
       <div className="w-full max-w-md rounded-2xl bg-white p-8 text-center shadow-lg">
-
         {error ? (
           <>
             <h2 className="text-xl font-bold text-red-600">
               Google Login Failed
             </h2>
 
-            <p className="mt-3 text-sm text-slate-600">
-              {error}
-            </p>
+            <p className="mt-3 text-sm text-slate-600">{error}</p>
 
             <button
-              onClick={() => {
-                window.location.replace("/login");
-              }}
+              onClick={() => navigate("/login", { replace: true })}
               className="mt-6 rounded-xl bg-emerald-600 px-6 py-3 font-semibold text-white hover:bg-emerald-700"
             >
               Back to Login
@@ -203,11 +180,10 @@ function OAuthCallback() {
             </h2>
 
             <p className="mt-2 text-sm text-slate-500">
-              Please wait while we redirect you to your dashboard.
+              Please wait while we process your Google account.
             </p>
           </>
         )}
-
       </div>
     </div>
   );
