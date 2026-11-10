@@ -314,11 +314,15 @@ Add screenshots here after capturing the latest deployed UI.
 
 | Customer Dashboard | Worker Dashboard |
 |---|---|
-| Add customer dashboard screenshot | Add worker dashboard screenshot |
+| <img width="1917" height="1078" alt="Screenshot 2026-11-10 145059" src="https://github.com/user-attachments/assets/9234596b-3d16-42f8-a764-2d0dc6293b13" />
+ | <img width="1917" height="1078" alt="image" src="https://github.com/user-attachments/assets/7c45963e-7a9e-43e6-ad02-fe72be9c66de" />
+ |
 
 | Authentication | Worker Profile |
 |---|---|
-| Add login/register screenshot | Add worker profile screenshot |
+| <img width="1917" height="1078" alt="image" src="https://github.com/user-attachments/assets/489c8da7-03f2-4abb-b776-e8942dfac284" />
+ | <img width="1917" height="1078" alt="image" src="https://github.com/user-attachments/assets/15be414a-350d-478a-b347-836aa91433e6" />
+ |
 
 ---
 
@@ -350,9 +354,9 @@ The application is deployed using separate frontend and backend hosting services
 | Backend | Render |
 | Database | Configure the production MySQL-compatible database |
 
-**Live Application:** YOUR_LIVE_FRONTEND_URL
+**Live Application:** https://workermanagement.vercel.app/
 
-**Backend:** YOUR_BACKEND_URL
+**Backend:** https://localworker-backend.onrender.com
 
 Deployment availability may depend on the hosting plan and service configuration.
 
