@@ -17,9 +17,9 @@
 </p>
 
 <p align="center">
-  <a href="YOUR_LIVE_FRONTEND_URL">Live Application</a> •
-  <a href="YOUR_BACKEND_URL">Backend</a> •
-  <a href="YOUR_GITHUB_REPOSITORY_URL">Source Code</a>
+  <a href="https://workermanagement.vercel.app/">Live Application</a> •
+  <a href="https://localworker-backend.onrender.com">Backend</a> •
+  <a href="https://github.com/harshal-269/Worker-Management.git">Source Code</a>
 </p>
 
 ---
