@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import api from "../api/axios";
 import {
   LayoutDashboard,
@@ -25,6 +25,7 @@ import {
   Plus,
   Trash2,
   RefreshCw,
+  Camera,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import NotificationBell from "./NotificationBell";
@@ -100,6 +101,23 @@ function WorkerDashboard() {
   const [workerLoading, setWorkerLoading] = useState(true);
   const [workerError, setWorkerError] = useState("");
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [imageError, setImageError] = useState("");
+  const [imageSuccess, setImageSuccess] = useState("");
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
+
+  const [showEditProfile, setShowEditProfile] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileError, setProfileError] = useState("");
+  const [profileSuccess, setProfileSuccess] = useState("");
+
+  const [profileForm, setProfileForm] = useState({
+    name: "",
+    location: "",
+    experience: 0,
+    description: "",
+  });
 
   const [isAvailable, setIsAvailable] = useState(true);
   const [availabilityUpdating, setAvailabilityUpdating] = useState(false);
@@ -240,6 +258,123 @@ function WorkerDashboard() {
       }
     };
   }, []);
+
+  const openEditProfile = () => {
+    if (!worker) return;
+
+    setProfileForm({
+      name: worker.name ?? "",
+      location: worker.location ?? "",
+      experience: worker.experience ?? 0,
+      description: worker.description ?? "",
+    });
+
+    setProfileError("");
+    setProfileSuccess("");
+    setShowEditProfile(true);
+  };
+
+  const handleProfileUpdate = async (
+    event: React.FormEvent<HTMLFormElement>,
+  ) => {
+    event.preventDefault();
+    if (!worker || profileSaving) return;
+
+    try {
+      setProfileSaving(true);
+      setProfileError("");
+      setProfileSuccess("");
+
+      const response = await api.put<Worker>("/workers/me/profile", {
+        name: profileForm.name.trim(),
+        location: profileForm.location.trim(),
+        experience: Number(profileForm.experience),
+        description: profileForm.description.trim(),
+      });
+
+      setWorker(response.data);
+      setIsAvailable(response.data.available);
+      setProfileSuccess("Profile updated successfully.");
+      setShowEditProfile(false);
+    } catch (error: any) {
+      console.error("Unable to update worker profile:", error);
+      setProfileError(
+        error.response?.data?.message ||
+          "Unable to update your profile. Please check your details and try again.",
+      );
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
+
+  const handleProfileImageSelection = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file || !worker || imageUploading) return;
+
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setImageError("Please choose a JPG, PNG, or WebP image.");
+      setImageSuccess("");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setImageError("Image size must be 5 MB or less.");
+      setImageSuccess("");
+      return;
+    }
+
+    setImageError("");
+    setImageSuccess("");
+    const previewUrl = URL.createObjectURL(file);
+    setImagePreviewUrl(previewUrl);
+
+    try {
+      setImageUploading(true);
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const uploadResponse = await api.post<{
+        message: string;
+        workerId: number;
+        filename: string;
+        imageUrl: string;
+      }>(`/images/upload/worker/${worker.id}`, formData);
+
+      const imageResponse = await api.get<Blob>(
+        `/images/${uploadResponse.data.filename}`,
+        { responseType: "blob" },
+      );
+
+      const nextImageUrl = URL.createObjectURL(imageResponse.data);
+      setProfileImageUrl((currentUrl) => {
+        if (currentUrl) URL.revokeObjectURL(currentUrl);
+        return nextImageUrl;
+      });
+
+      setWorker((currentWorker) =>
+        currentWorker
+          ? { ...currentWorker, profileImage: uploadResponse.data.imageUrl }
+          : currentWorker,
+      );
+
+      setImageSuccess("Profile picture updated successfully.");
+    } catch (error: any) {
+      console.error("Unable to upload profile image:", error);
+      setImageError(
+        error.response?.data?.message ||
+          "Unable to upload your profile picture. Please try again.",
+      );
+    } finally {
+      URL.revokeObjectURL(previewUrl);
+      setImagePreviewUrl(null);
+      setImageUploading(false);
+    }
+  };
 
 
 useEffect(() => {
@@ -505,9 +640,9 @@ useEffect(() => {
     <div
       className={`${size} flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-emerald-100 font-bold text-emerald-700`}
     >
-      {profileImageUrl ? (
+      {imagePreviewUrl || profileImageUrl ? (
         <img
-          src={profileImageUrl}
+          src={imagePreviewUrl || profileImageUrl || undefined}
           alt={`${workerName} profile`}
           className="h-full w-full object-cover"
         />
@@ -1457,9 +1592,9 @@ useEffect(() => {
             <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
               <div className="rounded-2xl border border-gray-100 bg-white p-6 text-center shadow-sm">
                 <div className="mx-auto flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-emerald-100 text-3xl font-bold text-emerald-700 ring-4 ring-emerald-50">
-                  {profileImageUrl ? (
+                  {imagePreviewUrl || profileImageUrl ? (
                     <img
-                      src={profileImageUrl}
+                      src={imagePreviewUrl || profileImageUrl || undefined}
                       alt={`${workerName} profile`}
                       className="h-full w-full object-cover"
                     />
@@ -1493,15 +1628,46 @@ useEffect(() => {
                 </div>
 
                 <button
-                  onClick={() =>
-                    window.alert(
-                      "Profile editing will be connected to the backend in a later phase.",
-                    )
-                  }
-                  className="mt-6 w-full rounded-xl border border-emerald-600 px-4 py-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50"
+                  type="button"
+                  onClick={openEditProfile}
+                  disabled={!worker || workerLoading}
+                  className="mt-6 w-full rounded-xl border border-emerald-600 px-4 py-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Edit Profile
                 </button>
+
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={handleProfileImageSelection}
+                />
+
+                <button
+                  type="button"
+                  onClick={() => imageInputRef.current?.click()}
+                  disabled={!worker || workerLoading || imageUploading}
+                  className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Camera size={17} />
+                  {imageUploading ? "Uploading picture..." : "Change Profile Picture"}
+                </button>
+
+                <p className="mt-2 text-xs text-gray-400">
+                  JPG, PNG or WebP · Maximum 5 MB
+                </p>
+
+                {imageError && (
+                  <p role="alert" className="mt-3 text-sm text-red-600">
+                    {imageError}
+                  </p>
+                )}
+                {imageSuccess && (
+                  <p role="status" className="mt-3 text-sm text-emerald-700">
+                    {imageSuccess}
+                  </p>
+                )}
               </div>
 
               <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm lg:col-span-2">
@@ -1592,7 +1758,7 @@ useEffect(() => {
                       </p>
                       <p className="mt-1 text-sm leading-6 text-emerald-800">
                         Your profile details are loaded from the LocalWorker
-                        backend. Profile editing will be added separately.
+                        backend. You can update your professional information using Edit Profile.
                       </p>
                     </div>
                   </div>
@@ -1649,6 +1815,130 @@ useEffect(() => {
               </div>
             </div>
           </section>
+
+          {profileSuccess && (
+            <div role="status" className="fixed right-4 top-24 z-[90] rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-medium text-emerald-800 shadow-lg">
+              {profileSuccess}
+            </div>
+          )}
+
+          {showEditProfile && (
+            <div
+              className="fixed inset-0 z-[85] flex items-center justify-center bg-gray-950/60 p-4"
+              onClick={() => { if (!profileSaving) setShowEditProfile(false); }}
+            >
+              <section
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="edit-worker-profile-title"
+                className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl sm:p-8"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-widest text-emerald-600">Your account</p>
+                    <h2 id="edit-worker-profile-title" className="mt-1 text-2xl font-extrabold text-gray-900">Edit profile</h2>
+                    <p className="mt-1 text-sm text-gray-500">Update the professional information customers see.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowEditProfile(false)}
+                    disabled={profileSaving}
+                    aria-label="Close edit profile"
+                    className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 disabled:opacity-50"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                {profileError && (
+                  <div role="alert" className="mt-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                    {profileError}
+                  </div>
+                )}
+
+                <form onSubmit={handleProfileUpdate} className="mt-6 space-y-5">
+                  <div>
+                    <label htmlFor="worker-profile-name" className="mb-2 block text-sm font-semibold text-gray-700">Full name</label>
+                    <input
+                      id="worker-profile-name"
+                      type="text"
+                      required
+                      minLength={2}
+                      maxLength={100}
+                      value={profileForm.name}
+                      onChange={(event) => setProfileForm((current) => ({ ...current, name: event.target.value }))}
+                      className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                      placeholder="Enter your full name"
+                    />
+                  </div>
+
+                  <div className="grid gap-5 sm:grid-cols-2">
+                    <div>
+                      <label htmlFor="worker-profile-location" className="mb-2 block text-sm font-semibold text-gray-700">Service location</label>
+                      <input
+                        id="worker-profile-location"
+                        type="text"
+                        required
+                        maxLength={150}
+                        value={profileForm.location}
+                        onChange={(event) => setProfileForm((current) => ({ ...current, location: event.target.value }))}
+                        className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                        placeholder="City or area"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="worker-profile-experience" className="mb-2 block text-sm font-semibold text-gray-700">Experience (years)</label>
+                      <input
+                        id="worker-profile-experience"
+                        type="number"
+                        required
+                        min={0}
+                        max={60}
+                        step={1}
+                        value={profileForm.experience}
+                        onChange={(event) => setProfileForm((current) => ({ ...current, experience: Number(event.target.value) }))}
+                        className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="worker-profile-description" className="mb-2 block text-sm font-semibold text-gray-700">Professional description</label>
+                    <textarea
+                      id="worker-profile-description"
+                      required
+                      maxLength={1000}
+                      rows={5}
+                      value={profileForm.description}
+                      onChange={(event) => setProfileForm((current) => ({ ...current, description: event.target.value }))}
+                      className="w-full resize-y rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                      placeholder="Describe your skills, experience and the services you provide"
+                    />
+                    <p className="mt-1 text-right text-xs text-gray-400">{profileForm.description.length}/1000</p>
+                  </div>
+
+                  <div className="flex flex-col-reverse gap-3 border-t border-gray-100 pt-5 sm:flex-row sm:justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setShowEditProfile(false)}
+                      disabled={profileSaving}
+                      className="rounded-xl border border-gray-200 px-5 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={profileSaving || !profileForm.name.trim() || !profileForm.location.trim() || !profileForm.description.trim() || profileForm.experience < 0 || profileForm.experience > 60}
+                      className="rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {profileSaving ? "Saving changes..." : "Save changes"}
+                    </button>
+                  </div>
+                </form>
+              </section>
+            </div>
+          )}
 
           {(bookingDetailsLoading || bookingDetailsError || selectedBooking) && (
             <div className="fixed inset-0 z-[80] flex items-center justify-center bg-gray-950/50 p-4" onClick={() => { setSelectedBooking(null); setBookingDetailsError(""); }}>

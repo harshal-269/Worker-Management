@@ -19,6 +19,7 @@ import jakarta.validation.Valid;
 
 import java.util.List;
 import java.util.Set;
+import com.localworker.backend.dto.WorkerProfileUpdateRequest;
 
 @RestController
 @RequestMapping("/api/workers")
@@ -59,6 +60,28 @@ public class WorkerController {
 
         return workerService.getCurrentWorker(
                 authentication.getName()
+        );
+    }
+
+    @PutMapping("/me/profile")
+    public WorkerResponseDTO updateCurrentWorkerProfile(
+            @Valid @RequestBody WorkerProfileUpdateRequest request) {
+
+        Authentication authentication =
+                SecurityContextHolder.getContext().getAuthentication();
+
+        if (authentication == null
+                || !authentication.isAuthenticated()
+                || authentication.getName() == null
+                || authentication.getName().equals("anonymousUser")) {
+
+            throw new AccessDeniedException(
+                    "Authentication is required");
+        }
+
+        return workerService.updateCurrentWorkerProfile(
+                authentication.getName(),
+                request
         );
     }
 

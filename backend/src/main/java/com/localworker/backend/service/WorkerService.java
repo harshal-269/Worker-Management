@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import com.localworker.backend.dto.WorkerProfileUpdateRequest;
 
 @org.springframework.stereotype.Service
 public class WorkerService {
@@ -131,6 +132,29 @@ public class WorkerService {
                         new RuntimeException("Worker profile not found"));
 
         return worker.getServices();
+    }
+
+    @Transactional
+    public WorkerResponseDTO updateCurrentWorkerProfile(
+            String email,
+            WorkerProfileUpdateRequest request) {
+
+        Worker worker = workerRepository.findByUser_Email(email)
+                .orElseThrow(() ->
+                        new RuntimeException(
+                                "Worker profile not found for logged-in user"));
+
+        // Update the worker's linked user name.
+        worker.getUser().setName(request.name().trim());
+
+        // Update professional information.
+        worker.setLocation(request.location().trim());
+        worker.setExperience(request.experience());
+        worker.setDescription(request.description().trim());
+
+        Worker savedWorker = workerRepository.save(worker);
+
+        return convertToDTO(savedWorker);
     }
 
     @Transactional
