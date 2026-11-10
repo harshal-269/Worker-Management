@@ -407,7 +407,7 @@ If you find an issue, please open a GitHub issue with the relevant details.
 Engineering Student | AI & Data Science | Full-Stack Java Developer
 
 - GitHub: https://github.com/harshal-269
-- LinkedIn: ADD_YOUR_LINKEDIN_URL
+- LinkedIn: https://www.linkedin.com/in/harshal-darandale-65a5132b5/
 - Portfolio: https://harshal-269.vercel.app
 
 ---
