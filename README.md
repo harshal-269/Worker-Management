@@ -1,82 +1,113 @@
-# LocalWorker — Local Services, Simplified.
+# LocalWorker
 
-<p align="center">
-  <strong>A Full-Stack Service Booking Platform Connecting Customers with Local Professionals.</strong>
-</p>
+<div align="center">
 
-<p align="center">
-  Find trusted local workers, request services, manage bookings, and connect with professionals — all through one platform.
-</p>
+### Connecting Customers with Trusted Local Professionals
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Java-21-orange?style=for-the-badge&logo=openjdk" alt="Java 21" />
-  <img src="https://img.shields.io/badge/Spring_Boot-4.1.1-6DB33F?style=for-the-badge&logo=springboot" alt="Spring Boot" />
-  <img src="https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React 19" />
-  <img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
-  <img src="https://img.shields.io/badge/MySQL-8.0-4479A1?style=for-the-badge&logo=mysql&logoColor=white" alt="MySQL" />
-</p>
+A full-stack service booking platform that simplifies how customers discover local professionals, request services, and manage bookings.
 
-<p align="center">
-  <a href="YOUR_LIVE_FRONTEND_URL">Live Application</a> •
-  <a href="YOUR_BACKEND_URL">Backend</a> •
-  <a href="YOUR_GITHUB_REPOSITORY_URL">Source Code</a>
-</p>
+<br/>
+
+[![Live Application](https://img.shields.io/badge/Live%20Application-Visit%20Now-2563EB?style=for-the-badge&logo=vercel&logoColor=white)](https://workermanagement.vercel.app/)
+[![Backend](https://img.shields.io/badge/Backend-Render-46E3B7?style=for-the-badge&logo=render&logoColor=black)](https://localworker-backend.onrender.com)
+[![GitHub](https://img.shields.io/badge/Source%20Code-GitHub-181717?style=for-the-badge&logo=github)](https://github.com/harshal-269/Worker-Management)
+
+<br/>
+
+![Java](https://img.shields.io/badge/Java-21-orange?style=flat-square&logo=openjdk)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.1-6DB33F?style=flat-square&logo=springboot)
+![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript)
+![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?style=flat-square&logo=mysql)
+![Vite](https://img.shields.io/badge/Vite-Frontend-646CFF?style=flat-square&logo=vite)
+
+</div>
 
 ---
 
 ## Overview
 
-**LocalWorker** is a full-stack local service booking platform designed to bridge the gap between customers who need everyday services and skilled professionals who provide them.
+**LocalWorker** is a full-stack local service booking platform designed to connect customers who need everyday services with skilled professionals who provide them.
 
-Finding reliable local service providers can be inconvenient. LocalWorker aims to simplify this experience by bringing customers and workers together through a centralized platform.
+Finding reliable local service providers can be inconvenient. LocalWorker brings customers and workers together through a centralized platform where users can discover services, manage profiles, and handle service bookings.
 
-Customers can discover services, connect with workers, and manage service bookings. Workers can manage their profiles, showcase their services, and handle incoming booking requests.
+The application provides separate experiences for customers and workers, supported by secure authentication, role-based authorization, REST APIs, and database persistence.
 
-The platform also incorporates authentication, role-based access control, booking management, and notifications to support the complete service-booking experience.
-
-> **Project focus:** Building a practical, secure, and maintainable full-stack application using modern Java and React technologies.
+**The goal:** Build a practical, maintainable, and scalable full-stack application while applying real-world software engineering concepts.
 
 ## The Problem
 
 Finding dependable local professionals often involves:
 
 - Relying on word-of-mouth recommendations.
-- Having difficulty comparing available service providers.
+- Difficulty comparing available service providers.
 - Managing service requests through calls and messages.
-- Lacking a centralized way to track booking status.
-- Limited visibility into worker profiles and service information.
+- Lack of centralized booking management.
+- Limited visibility into worker profiles and services.
 
 ## The Solution
 
 LocalWorker provides a centralized platform where:
 
-- Customers can explore services and request bookings.
+- Customers can discover services and request bookings.
 - Workers can manage their profiles and service offerings.
 - Booking requests can be accepted or rejected with a reason.
-- Users can track booking information through their dashboards.
-- Role-based access ensures users interact with the features intended for them.
+- Customers can track booking information and statuses.
+- Role-based access separates customer, worker, and administrator functionality.
+
+---
+
+## Application Preview
+
+<div align="center">
+
+### Customer Dashboard
+
+<img src="https://github.com/user-attachments/assets/9234596b-3d16-42f8-a764-2d0dc6293b13" width="480" alt="LocalWorker Customer Dashboard" />
+
+<br/><br/>
+
+### Worker Dashboard
+
+<img src="https://github.com/user-attachments/assets/7c45963e-7a9e-43e6-ad02-fe72be9c66de" width="480" alt="LocalWorker Worker Dashboard" />
+
+<br/><br/>
+
+### Authentication
+
+<img src="https://github.com/user-attachments/assets/489c8da7-03f2-4abb-b776-e8942dfac284" width="480" alt="LocalWorker Authentication Interface" />
+
+<br/><br/>
+
+### Worker Profile
+
+<img src="https://github.com/user-attachments/assets/15be414a-350d-478a-b347-836aa91433e6" width="480" alt="LocalWorker Worker Profile" />
+
+</div>
 
 ---
 
 ## Key Features
 
 ### Authentication & Security
+
 - User registration and login.
 - JWT-based authentication.
 - Role-based authorization.
 - Google OAuth 2.0 authentication.
-- Protected API endpoints.
-- Password encryption using Spring Security.
+- Protected REST API endpoints.
+- Password hashing using Spring Security.
 
 ### Customer Features
-- Customer dashboard.
+
+- Dedicated customer dashboard.
 - Browse available services and workers.
 - Submit service booking requests.
-- Track booking information and status.
+- Track booking information and statuses.
 - View booking rejection reasons.
-- Manage customer-related interactions.
 
 ### Worker Features
+
 - Dedicated worker dashboard.
 - Worker profile management.
 - Profile picture upload.
@@ -85,7 +116,8 @@ LocalWorker provides a centralized platform where:
 - Accept or reject booking requests.
 - Provide rejection reasons.
 
-### Booking Management
+### Booking & Notifications
+
 - Customer-to-worker booking workflow.
 - Booking status management.
 - Booking request handling.
@@ -93,93 +125,74 @@ LocalWorker provides a centralized platform where:
 - Booking-related notifications.
 
 ### Backend Engineering
-- RESTful API architecture.
-- Layered application structure.
+
+- RESTful API development.
+- Layered monolithic architecture.
 - DTO-based request and response handling.
 - Input validation.
 - Global exception handling.
 - Spring Data JPA integration.
-- MySQL persistence.
-
-*Feature availability should be checked against the latest deployed application before publishing this section.*
+- MySQL database persistence.
 
 ---
 
 ## Technology Stack
 
 | Layer | Technologies |
-|---|---|
+|:--|:--|
 | Frontend | React 19, TypeScript |
-| Build Tool | Vite |
+| Frontend Tooling | Vite |
 | Backend | Java 21, Spring Boot |
 | API | Spring Web, REST |
-| Security | Spring Security, JWT, OAuth 2.0 |
-| ORM | Spring Data JPA, Hibernate |
+| Security | Spring Security, JWT, Google OAuth 2.0 |
+| Persistence | Spring Data JPA, Hibernate |
 | Database | MySQL 8 |
 | Validation | Jakarta Bean Validation |
-| Build | Maven, npm |
+| Backend Build | Maven |
+| Frontend Build | npm |
 | Version Control | Git, GitHub |
-| Deployment | Vercel, Render |
+| Frontend Deployment | Vercel |
+| Backend Deployment | Render |
 
 ---
 
-## Architecture
+## System Architecture
 
-LocalWorker follows a **monolithic layered architecture**.
+LocalWorker follows a **layered monolithic architecture**.
 
-The frontend communicates with the Spring Boot backend through REST APIs. The backend separates responsibilities into controllers, services, repositories, models, DTOs, and exception-handling components.
+The React frontend communicates with the Spring Boot backend through REST APIs. The backend separates responsibilities into controllers, services, repositories, models, DTOs, and exception-handling components.
 
-```text
-                 ┌─────────────────────────┐
-                 │       React Client      │
-                 │     React + TypeScript  │
-                 └────────────┬────────────┘
-                              │
-                         REST API
-                              │
-                 ┌────────────▼────────────┐
-                 │    Spring Boot Backend  │
-                 │                         │
-                 │  ┌───────────────────┐  │
-                 │  │    Controllers   │  │
-                 │  └─────────┬─────────┘  │
-                 │            │            │
-                 │  ┌─────────▼─────────┐  │
-                 │  │     Services      │  │
-                 │  └─────────┬─────────┘  │
-                 │            │            │
-                 │  ┌─────────▼─────────┐  │
-                 │  │   Repositories    │  │
-                 │  └─────────┬─────────┘  │
-                 │            │            │
-                 │  ┌─────────▼─────────┐  │
-                 │  │    Spring Data    │  │
-                 │  │       JPA         │  │
-                 │  └─────────┬─────────┘  │
-                 └────────────┼────────────┘
-                              │
-                 ┌────────────▼────────────┐
-                 │       MySQL Database    │
-                 └─────────────────────────┘
+```mermaid
+flowchart TD
+    A["React Frontend<br/>React 19 + TypeScript"] -->|"HTTP / REST API"| B["Spring Boot Backend"]
+
+    B --> C["Controller Layer"]
+    C --> D["Service Layer"]
+    D --> E["Repository Layer"]
+    E --> F["Spring Data JPA / Hibernate"]
+    F --> G[("MySQL Database")]
+
+    B --> H["Spring Security / JWT"]
+    B --> I["Validation & Global Exception Handling"]
 ```
 
 ### Backend Layer Responsibilities
 
 | Layer | Responsibility |
-|---|---|
+|:--|:--|
 | Controller | Handles HTTP requests and responses |
-| Service | Implements business logic |
-| Repository | Handles database operations |
+| Service | Contains application business logic |
+| Repository | Performs database operations |
 | Model | Represents application entities |
 | DTO | Transfers structured request and response data |
-| Exception | Centralizes application error handling |
+| Exception | Handles application errors centrally |
 
 ---
 
 ## Project Structure
 
 ```text
-LocalWorker/
+Worker-Management/
 │
 ├── backend/
 │   ├── src/main/java/com/localworker/backend/
@@ -215,10 +228,10 @@ Follow these instructions to run LocalWorker locally.
 
 ### Prerequisites
 
-Install the following:
+Make sure you have installed:
 
 - Java 21
-- Maven (or use the included Maven Wrapper)
+- Maven or the included Maven Wrapper
 - Node.js and npm
 - MySQL 8
 - Git
@@ -226,26 +239,34 @@ Install the following:
 ### 1. Clone the Repository
 
 ```bash
-git clone YOUR_GITHUB_REPOSITORY_URL
+git clone https://github.com/harshal-269/Worker-Management.git
+
 cd Worker-Management
 ```
 
 ### 2. Configure the Database
 
-Create a MySQL database:
+Create the database in MySQL:
 
 ```sql
 CREATE DATABASE localworker_db;
 ```
 
-Configure your database connection in the backend application configuration.
+Configure the backend database connection using your local environment configuration.
 
-**Important:** Never commit actual database passwords, JWT secrets, OAuth client secrets, or other sensitive credentials.
+Do not commit actual database passwords, JWT secrets, OAuth client secrets, or other sensitive credentials.
 
 ### 3. Run the Backend
 
+Open a terminal:
+
 ```bash
 cd backend
+```
+
+On Windows:
+
+```cmd
 mvnw.cmd spring-boot:run
 ```
 
@@ -257,9 +278,7 @@ On Linux/macOS:
 
 Backend default address:
 
-```text
-http://localhost:8080
-```
+`http://localhost:8080`
 
 ### 4. Run the Frontend
 
@@ -267,62 +286,46 @@ Open another terminal:
 
 ```bash
 cd frontend
+
 npm install
+
 npm run dev
 ```
 
 Frontend development address:
 
-```text
-http://localhost:5174
-```
+`http://localhost:5174`
 
-The actual port depends on the Vite configuration.
+The actual development port depends on the Vite configuration.
 
 ---
 
 ## API Overview
 
-The backend exposes REST endpoints for authentication, users, workers, services, bookings, and related application operations.
+The backend exposes REST APIs for authentication, users, workers, images, services, and bookings.
 
-Some known authentication endpoints:
+### Authentication APIs
 
-| Method | Endpoint | Purpose |
-|---|---|---|
-| POST | `/api/auth/register` | Register a user |
+| Method | Endpoint | Description |
+|:--|:--|:--|
+| POST | `/api/auth/register` | Register a new user |
 | POST | `/api/auth/login` | Authenticate a user |
 
-Other API groups:
+### Other API Groups
 
 | API Group | Responsibility |
-|---|---|
+|:--|:--|
 | `/api/users` | User-related operations |
 | `/api/workers` | Worker profiles and operations |
 | `/api/images` | Image upload and retrieval |
 | Booking APIs | Booking lifecycle management |
 | Service APIs | Service-related operations |
 
-*Refer to the backend controllers for the complete and current endpoint list.*
+Refer to the backend controllers for the complete endpoint list.
 
 ---
 
-## Application Screenshots
-
-Screenshots help reviewers understand the actual application without needing to run it.
-
-Add screenshots here after capturing the latest deployed UI.
-
-| Customer Dashboard | Worker Dashboard |
-|---|---|
-| Add customer dashboard screenshot | Add worker dashboard screenshot |
-
-| Authentication | Worker Profile |
-|---|---|
-| Add login/register screenshot | Add worker profile screenshot |
-
----
-
-## Security Considerations
+## Security
 
 Security is an important part of LocalWorker's backend implementation.
 
@@ -334,45 +337,40 @@ The application incorporates:
 - Password hashing.
 - Request validation.
 - Centralized exception handling.
-- Environment-based configuration for sensitive credentials.
+- Secure configuration practices for sensitive credentials.
 
-Production deployment must use secure secrets, HTTPS, and correctly configured OAuth redirect URLs.
+Production deployment should use secure secrets, HTTPS, and correctly configured OAuth redirect URLs.
 
 ---
 
 ## Deployment
 
-The application is deployed using separate frontend and backend hosting services.
+LocalWorker uses separate hosting services for the frontend and backend.
 
-| Component | Platform |
-|---|---|
-| Frontend | Vercel |
-| Backend | Render |
-| Database | Configure the production MySQL-compatible database |
+| Component | Platform | Link |
+|:--|:--|:--|
+| Frontend | Vercel | [Live Application](https://workermanagement.vercel.app/) |
+| Backend | Render | [Backend Service](https://localworker-backend.onrender.com) |
+| Source Code | GitHub | [Repository](https://github.com/harshal-269/Worker-Management) |
 
-**Live Application:** YOUR_LIVE_FRONTEND_URL
-
-**Backend:** YOUR_BACKEND_URL
-
-Deployment availability may depend on the hosting plan and service configuration.
+The live application may experience availability delays depending on hosting service behavior and plan limitations.
 
 ---
 
 ## Engineering Highlights
 
-LocalWorker is being developed with an emphasis on practical backend engineering and full-stack development.
-
-Key engineering concepts applied include:
+This project demonstrates practical application of:
 
 - Layered monolithic architecture.
-- REST API design.
+- RESTful API design.
+- Separation of concerns.
 - DTO-based data transfer.
-- Separation of business logic from controllers.
 - JWT authentication and role-based authorization.
-- ORM-based database persistence.
-- Validation and centralized exception handling.
-- React component-based frontend development.
-- Integration between independently developed frontend and backend layers.
+- Object-relational mapping using JPA and Hibernate.
+- Input validation and centralized exception handling.
+- Frontend-backend integration.
+- File upload and retrieval.
+- Git-based version control and deployment workflows.
 
 ---
 
@@ -390,32 +388,22 @@ Planned improvements include:
 
 ---
 
-## Contributing
-
-This project is currently maintained as an actively developed software engineering project.
-
-Suggestions, bug reports, and improvement ideas are welcome.
-
-If you find an issue, please open a GitHub issue with the relevant details.
-
----
-
 ## Author
 
-**Harshal Darandale**
+<div align="center">
 
-Engineering Student | AI & Data Science | Full-Stack Java Developer
+### Harshal Darandale
 
-- GitHub: https://github.com/harshal-269
-- LinkedIn: ADD_YOUR_LINKEDIN_URL
-- Portfolio: https://harshal-269.vercel.app
+**AI & Data Science Engineering Student | Full-Stack Java Developer**
 
----
+[![GitHub](https://img.shields.io/badge/GitHub-181717?style=for-the-badge&logo=github)](https://github.com/harshal-269)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?style=for-the-badge&logo=linkedin)](https://www.linkedin.com/in/harshal-darandale-65a5132b5/)
+[![Portfolio](https://img.shields.io/badge/Portfolio-Visit-2563EB?style=for-the-badge&logo=vercel)](https://harshal-269.vercel.app)
 
-<p align="center">
-  <strong>LocalWorker — Connecting People. Empowering Local Professionals.</strong>
-</p>
+<br/>
 
-<p align="center">
-  Built with Java, Spring Boot, React, TypeScript and MySQL.
-</p>
+**LocalWorker — Connecting People. Empowering Local Professionals.**
+
+Built with Java, Spring Boot, React, TypeScript and MySQL.
+
+</div>
