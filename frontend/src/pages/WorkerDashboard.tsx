@@ -72,6 +72,8 @@ interface Booking {
   address: string;
   problemDescription: string;
   status: BookingStatus;
+  rejectionReason?: string | null;
+  rejectedAt?: string | null;
 }
 
 interface Review {
@@ -126,6 +128,9 @@ function WorkerDashboard() {
   const [bookingsLoading, setBookingsLoading] = useState(true);
   const [bookingsError, setBookingsError] = useState("");
   const [bookingActionLoading, setBookingActionLoading] = useState<number | null>(null);
+  const [rejectingBooking, setRejectingBooking] = useState<Booking | null>(null);
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [rejectionError, setRejectionError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [showAllBookings, setShowAllBookings] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
@@ -543,7 +548,7 @@ useEffect(() => {
 
   const updateBookingStatus = async (
     bookingId: number,
-    action: "accept" | "reject" | "start" | "complete",
+    action: "accept" | "start" | "complete",
   ) => {
     try {
       setBookingActionLoading(bookingId);
@@ -554,9 +559,75 @@ useEffect(() => {
           booking.id === bookingId ? response.data : booking,
         ),
       );
+      if (selectedBooking?.id === bookingId) {
+        setSelectedBooking(response.data);
+      }
     } catch (error) {
       console.error(`Unable to ${action} booking:`, error);
       setBookingsError(`Unable to ${action} booking. Please try again.`);
+    } finally {
+      setBookingActionLoading(null);
+    }
+  };
+
+  const openRejectBookingModal = (booking: Booking) => {
+    setRejectingBooking(booking);
+    setRejectionReason("");
+    setRejectionError("");
+  };
+
+  const closeRejectBookingModal = () => {
+    if (bookingActionLoading !== null) return;
+    setRejectingBooking(null);
+    setRejectionReason("");
+    setRejectionError("");
+  };
+
+  const submitBookingRejection = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!rejectingBooking || bookingActionLoading !== null) return;
+
+    const reason = rejectionReason.trim();
+    if (!reason) {
+      setRejectionError("Please provide a reason for rejecting this booking.");
+      return;
+    }
+    if (reason.length > 1000) {
+      setRejectionError("The reason must not exceed 1000 characters.");
+      return;
+    }
+
+    const bookingId = rejectingBooking.id;
+
+    try {
+      setBookingActionLoading(bookingId);
+      setBookingsError("");
+      setRejectionError("");
+
+      const response = await api.put<Booking>(
+        `/bookings/${bookingId}/reject`,
+        { reason },
+      );
+
+      setBookings((currentBookings) =>
+        currentBookings.map((booking) =>
+          booking.id === bookingId ? response.data : booking,
+        ),
+      );
+
+      if (selectedBooking?.id === bookingId) {
+        setSelectedBooking(response.data);
+      }
+
+      setRejectingBooking(null);
+      setRejectionReason("");
+    } catch (error: any) {
+      console.error("Unable to reject booking:", error);
+      setRejectionError(
+        error.response?.data?.message ||
+          "Unable to reject this booking. Please try again.",
+      );
     } finally {
       setBookingActionLoading(null);
     }
@@ -1222,7 +1293,7 @@ useEffect(() => {
                                 <Check size={16} />
                               </button>
                               <button
-                                onClick={() => void updateBookingStatus(booking.id, "reject")}
+                                onClick={() => openRejectBookingModal(booking)}
                                 disabled={bookingActionLoading === booking.id}
                                 title="Reject booking"
                                 aria-label={`Reject booking ${booking.id}`}
@@ -1940,6 +2011,86 @@ useEffect(() => {
             </div>
           )}
 
+          {rejectingBooking && (
+            <div
+              className="fixed inset-0 z-[95] flex items-center justify-center bg-gray-950/60 p-4"
+              onClick={closeRejectBookingModal}
+            >
+              <section
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="reject-booking-title"
+                className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl sm:p-8"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-widest text-red-600">Booking decision</p>
+                    <h2 id="reject-booking-title" className="mt-1 text-2xl font-extrabold text-gray-900">Reject booking</h2>
+                    <p className="mt-2 text-sm leading-6 text-gray-500">Please explain why you cannot accept this request. The customer will be able to see your reason.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={closeRejectBookingModal}
+                    disabled={bookingActionLoading === rejectingBooking.id}
+                    aria-label="Close rejection dialog"
+                    className="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 disabled:opacity-50"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <div className="mt-5 rounded-xl bg-gray-50 p-4">
+                  <p className="text-sm font-semibold text-gray-900">Booking #{rejectingBooking.id}</p>
+                  <p className="mt-1 text-sm text-gray-600">{rejectingBooking.serviceName} · {rejectingBooking.customerName || `Customer #${rejectingBooking.customerId}`}</p>
+                </div>
+
+                <form onSubmit={submitBookingRejection} className="mt-5 space-y-4">
+                  <div>
+                    <label htmlFor="booking-rejection-reason" className="mb-2 block text-sm font-semibold text-gray-700">Reason for rejection <span className="text-red-600">*</span></label>
+                    <textarea
+                      id="booking-rejection-reason"
+                      required
+                      autoFocus
+                      rows={5}
+                      maxLength={1000}
+                      value={rejectionReason}
+                      onChange={(event) => {
+                        setRejectionReason(event.target.value);
+                        if (rejectionError) setRejectionError("");
+                      }}
+                      placeholder="For example: I am unavailable at the requested time..."
+                      className="w-full resize-y rounded-xl border border-gray-200 px-4 py-3 text-sm leading-6 outline-none transition focus:border-red-400 focus:ring-2 focus:ring-red-100"
+                    />
+                    <p className="mt-1 text-right text-xs text-gray-400">{rejectionReason.length}/1000</p>
+                  </div>
+
+                  {rejectionError && (
+                    <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{rejectionError}</p>
+                  )}
+
+                  <div className="flex flex-col-reverse gap-3 border-t border-gray-100 pt-5 sm:flex-row sm:justify-end">
+                    <button
+                      type="button"
+                      onClick={closeRejectBookingModal}
+                      disabled={bookingActionLoading === rejectingBooking.id}
+                      className="rounded-xl border border-gray-200 px-5 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Go back
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={bookingActionLoading === rejectingBooking.id || !rejectionReason.trim()}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {bookingActionLoading === rejectingBooking.id ? "Rejecting..." : "Confirm rejection"}
+                    </button>
+                  </div>
+                </form>
+              </section>
+            </div>
+          )}
+
           {(bookingDetailsLoading || bookingDetailsError || selectedBooking) && (
             <div className="fixed inset-0 z-[80] flex items-center justify-center bg-gray-950/50 p-4" onClick={() => { setSelectedBooking(null); setBookingDetailsError(""); }}>
               <section role="dialog" aria-modal="true" aria-labelledby="worker-booking-details-title" className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
@@ -1956,6 +2107,15 @@ useEffect(() => {
                       <div><p className="text-xs font-semibold uppercase text-gray-400">Scheduled</p><p className="mt-1 font-semibold text-gray-800">{formatBookingDate(selectedBooking.scheduledAt)} {formatBookingTime(selectedBooking.scheduledAt)}</p></div>
                       <div className="sm:col-span-2"><p className="text-xs font-semibold uppercase text-gray-400">Service address</p><p className="mt-1 text-sm text-gray-700">{selectedBooking.address}</p></div>
                       <div className="sm:col-span-2"><p className="text-xs font-semibold uppercase text-gray-400">Problem description</p><p className="mt-1 whitespace-pre-wrap text-sm text-gray-700">{selectedBooking.problemDescription || "No description provided."}</p></div>
+                      {selectedBooking.status === "REJECTED" && selectedBooking.rejectionReason && (
+                        <div className="sm:col-span-2 rounded-xl border border-red-100 bg-red-50 p-4">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Rejection reason</p>
+                          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-red-800">{selectedBooking.rejectionReason}</p>
+                          {selectedBooking.rejectedAt && (
+                            <p className="mt-2 text-xs text-red-600">Rejected on {formatBookingDate(selectedBooking.rejectedAt)} at {formatBookingTime(selectedBooking.rejectedAt)}</p>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div className="mt-6 rounded-2xl border border-emerald-100 p-5"><h3 className="font-bold text-gray-900">Customer information</h3><p className="mt-3 font-semibold text-gray-800">{selectedBooking.customerName || `Customer #${selectedBooking.customerId}`}</p><p className="mt-1 text-sm text-gray-600">{selectedBooking.customerEmail || "Email not available"}</p><p className="mt-1 text-sm text-gray-600">{selectedBooking.customerPhone || "Phone not available"}</p></div>
                   </>}
