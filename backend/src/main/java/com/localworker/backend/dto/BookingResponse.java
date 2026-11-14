@@ -3,15 +3,14 @@ package com.localworker.backend.dto;
 import com.localworker.backend.model.BookingStatus;
 
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 
 public class BookingResponse {
 
     private Long id;
 
     private Long customerId;
-
     private Long workerId;
-
     private Long serviceId;
 
     private String serviceName;
@@ -19,6 +18,7 @@ public class BookingResponse {
     private String customerName;
     private String customerEmail;
     private String customerPhone;
+
     private String workerName;
     private String workerEmail;
     private String workerPhone;
@@ -28,17 +28,16 @@ public class BookingResponse {
     private LocalDateTime scheduledAt;
 
     private String address;
-
     private String problemDescription;
+
+    private BigDecimal visitingCharge;
 
     private BookingStatus status;
 
     private String cancellationReason;
-
     private String rejectionReason;
 
     private LocalDateTime cancelledAt;
-
     private LocalDateTime rejectedAt;
 
     public BookingResponse() {
@@ -84,29 +83,69 @@ public class BookingResponse {
         this.serviceName = serviceName;
     }
 
-    public String getCustomerName() { return customerName; }
-    public void setCustomerName(String customerName) { this.customerName = customerName; }
+    public String getCustomerName() {
+        return customerName;
+    }
 
-    public String getCustomerEmail() { return customerEmail; }
-    public void setCustomerEmail(String customerEmail) { this.customerEmail = customerEmail; }
+    public void setCustomerName(String customerName) {
+        this.customerName = customerName;
+    }
 
-    public String getCustomerPhone() { return customerPhone; }
-    public void setCustomerPhone(String customerPhone) { this.customerPhone = customerPhone; }
+    public String getCustomerEmail() {
+        return customerEmail;
+    }
 
-    public String getWorkerName() { return workerName; }
-    public void setWorkerName(String workerName) { this.workerName = workerName; }
+    public void setCustomerEmail(String customerEmail) {
+        this.customerEmail = customerEmail;
+    }
 
-    public String getWorkerEmail() { return workerEmail; }
-    public void setWorkerEmail(String workerEmail) { this.workerEmail = workerEmail; }
+    public String getCustomerPhone() {
+        return customerPhone;
+    }
 
-    public String getWorkerPhone() { return workerPhone; }
-    public void setWorkerPhone(String workerPhone) { this.workerPhone = workerPhone; }
+    public void setCustomerPhone(String customerPhone) {
+        this.customerPhone = customerPhone;
+    }
 
-    public String getWorkerLocation() { return workerLocation; }
-    public void setWorkerLocation(String workerLocation) { this.workerLocation = workerLocation; }
+    public String getWorkerName() {
+        return workerName;
+    }
 
-    public Integer getWorkerExperience() { return workerExperience; }
-    public void setWorkerExperience(Integer workerExperience) { this.workerExperience = workerExperience; }
+    public void setWorkerName(String workerName) {
+        this.workerName = workerName;
+    }
+
+    public String getWorkerEmail() {
+        return workerEmail;
+    }
+
+    public void setWorkerEmail(String workerEmail) {
+        this.workerEmail = workerEmail;
+    }
+
+    public String getWorkerPhone() {
+        return workerPhone;
+    }
+
+    public void setWorkerPhone(String workerPhone) {
+        this.workerPhone = workerPhone;
+    }
+
+    public String getWorkerLocation() {
+        return workerLocation;
+    }
+
+    public void setWorkerLocation(String workerLocation) {
+        this.workerLocation = workerLocation;
+    }
+
+    public Integer getWorkerExperience() {
+        return workerExperience;
+    }
+
+    public void setWorkerExperience(Integer workerExperience) {
+        this.workerExperience = workerExperience;
+    }
 
     public LocalDateTime getScheduledAt() {
         return scheduledAt;
@@ -130,6 +169,14 @@ public class BookingResponse {
 
     public void setProblemDescription(String problemDescription) {
         this.problemDescription = problemDescription;
+    }
+
+    public BigDecimal getVisitingCharge() {
+        return visitingCharge;
+    }
+
+    public void setVisitingCharge(BigDecimal visitingCharge) {
+        this.visitingCharge = visitingCharge;
     }
 
     public BookingStatus getStatus() {

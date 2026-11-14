@@ -1,3 +1,4 @@
+
 import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
 
 import Home from "./pages/Home";
@@ -48,10 +49,23 @@ function App() {
         <Route path="/oauth2/callback" element={<OAuthCallback />} />
         <Route path="/select-role" element={<SelectRole />} />
 
-        {/* Dashboards */}
-        <Route path="/admin/dashboard" element={<AdminDashboard />} />
-        <Route path="/customer/dashboard" element={<CustomerDashboard />} />
-        <Route path="/worker/dashboard" element={<WorkerDashboard />} />
+        {/* Customer dashboard - supports nested routes */}
+        <Route
+          path="/customer/dashboard/*"
+          element={<CustomerDashboard />}
+        />
+
+        {/* Worker dashboard */}
+        <Route
+          path="/worker/dashboard/*"
+          element={<WorkerDashboard />}
+        />
+
+        {/* Admin dashboard */}
+        <Route
+          path="/admin/dashboard"
+          element={<AdminDashboard />}
+        />
 
         <Route path="*" element={<NotFound />} />
       </Routes>

@@ -26,9 +26,11 @@ import {
   Trash2,
   RefreshCw,
   Camera,
+  ReceiptText,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import NotificationBell from "./NotificationBell";
+import WorkerBillingPanel from "./WorkerBillingPanel";
 
 type BookingStatus =
   | "PENDING"
@@ -52,6 +54,17 @@ interface ServiceItem {
   id: number;
   name: string;
   description: string;
+  price: number | null;
+  active: boolean;
+}
+
+interface WorkerServiceOffering {
+  id: number;
+  serviceId: number;
+  serviceName: string;
+  serviceDescription: string | null;
+  price: number | null;
+  active: boolean;
 }
 
 interface Booking {
@@ -90,6 +103,7 @@ interface Review {
 const sidebarItems = [
   { label: "Overview", icon: LayoutDashboard, id: "overview" },
   { label: "My Bookings", icon: ClipboardList, id: "bookings" },
+  { label: "My Bills", icon: ReceiptText, id: "bills" },
   { label: "My Services", icon: BriefcaseBusiness, id: "services" },
   { label: "Reviews", icon: Star, id: "reviews" },
   { label: "My Profile", icon: UserRound, id: "profile" },
@@ -97,7 +111,17 @@ const sidebarItems = [
 
 function WorkerDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeSection, setActiveSection] = useState("overview");
+  const location = useLocation();
+  const navigate = useNavigate();
+  const routeSection = location.pathname.split("/").filter(Boolean).pop() || "overview";
+  const validSections = ["overview", "bookings", "bills", "services", "reviews", "profile", "settings"];
+  const activeSection = validSections.includes(routeSection) ? routeSection : "overview";
+
+  useEffect(() => {
+    if (location.pathname === "/worker/dashboard" || location.pathname === "/worker/dashboard/") {
+      navigate("/worker/dashboard/overview", { replace: true });
+    }
+  }, [location.pathname, navigate]);
 
   const [worker, setWorker] = useState<Worker | null>(null);
   const [workerLoading, setWorkerLoading] = useState(true);
@@ -143,7 +167,10 @@ function WorkerDashboard() {
   const [servicesError, setServicesError] = useState("");
   const [serviceActionLoading, setServiceActionLoading] = useState<number | null>(null);
   const [selectedServiceId, setSelectedServiceId] = useState("");
+  const [selectedServicePrice, setSelectedServicePrice] = useState("");
   const [showAddService, setShowAddService] = useState(false);
+  const [editingServiceId, setEditingServiceId] = useState<number | null>(null);
+  const [editingServicePrice, setEditingServicePrice] = useState("");
 
   const [reviews, setReviews] = useState<Review[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(true);
@@ -449,25 +476,29 @@ useEffect(() => {
 
   const loadWorkerServices = async (showLoading = true) => {
     try {
-      if (showLoading) {
-        setServicesLoading(true);
-      }
+      if (showLoading) setServicesLoading(true);
       setServicesError("");
 
-      const [assignedResponse, catalogResponse] = await Promise.all([
-        api.get<ServiceItem[]>("/workers/me/services"),
+      const [offeringsResponse, catalogResponse] = await Promise.all([
+        api.get<WorkerServiceOffering[]>("/workers/me/offerings"),
         api.get<ServiceItem[]>("/services"),
       ]);
 
-      setWorkerServices(assignedResponse.data);
+      const mappedOfferings: ServiceItem[] = offeringsResponse.data.map((offering) => ({
+        id: offering.serviceId,
+        name: offering.serviceName,
+        description: offering.serviceDescription ?? "",
+        price: offering.price,
+        active: offering.active,
+      }));
+
+      setWorkerServices(mappedOfferings);
       setServiceCatalog(catalogResponse.data);
     } catch (error) {
-      console.error("Unable to load worker services:", error);
-      setServicesError("Unable to load services. Please try again.");
+      console.error("Unable to load worker service offerings:", error);
+      setServicesError("Unable to load your services and prices. Please try again.");
     } finally {
-      if (showLoading) {
-        setServicesLoading(false);
-      }
+      if (showLoading) setServicesLoading(false);
     }
   };
 
@@ -477,22 +508,65 @@ useEffect(() => {
 
   const addWorkerService = async () => {
     const serviceId = Number(selectedServiceId);
-    if (!serviceId || serviceActionLoading !== null) return;
+    const price = Number(selectedServicePrice);
+
+    if (!serviceId || !Number.isFinite(price) || price < 1 || serviceActionLoading !== null) {
+      setServicesError("Select a service and enter a valid price of at least ₹1.");
+      return;
+    }
 
     try {
       setServiceActionLoading(serviceId);
       setServicesError("");
 
-      const response = await api.post<ServiceItem[]>(
-        `/workers/me/services/${serviceId}`,
-      );
+      await api.post<WorkerServiceOffering>("/workers/me/offerings", {
+        serviceId,
+        price,
+      });
 
-      setWorkerServices(response.data);
       setSelectedServiceId("");
+      setSelectedServicePrice("");
       setShowAddService(false);
+      await loadWorkerServices(false);
     } catch (error) {
-      console.error("Unable to add worker service:", error);
-      setServicesError("Unable to add this service. Please try again.");
+      console.error("Unable to add worker service offering:", error);
+      setServicesError(
+        "Unable to add this service. It may already exist, or the price may be invalid.",
+      );
+    } finally {
+      setServiceActionLoading(null);
+    }
+  };
+
+  const startEditingServicePrice = (service: ServiceItem) => {
+    setEditingServiceId(service.id);
+    setEditingServicePrice(service.price === null ? "" : String(service.price));
+    setServicesError("");
+  };
+
+  const updateWorkerServicePrice = async (serviceId: number) => {
+    const price = Number(editingServicePrice);
+
+    if (!Number.isFinite(price) || price < 1 || serviceActionLoading !== null) {
+      setServicesError("Enter a valid price of at least ₹1.");
+      return;
+    }
+
+    try {
+      setServiceActionLoading(serviceId);
+      setServicesError("");
+
+      await api.put<WorkerServiceOffering>(`/workers/me/offerings/${serviceId}`, {
+        serviceId,
+        price,
+      });
+
+      setEditingServiceId(null);
+      setEditingServicePrice("");
+      await loadWorkerServices(false);
+    } catch (error) {
+      console.error("Unable to update service price:", error);
+      setServicesError("Unable to update this price. Please try again.");
     } finally {
       setServiceActionLoading(null);
     }
@@ -510,13 +584,10 @@ useEffect(() => {
       setServiceActionLoading(serviceId);
       setServicesError("");
 
-      const response = await api.delete<ServiceItem[]>(
-        `/workers/me/services/${serviceId}`,
-      );
-
-      setWorkerServices(response.data);
+      await api.delete(`/workers/me/offerings/${serviceId}`);
+      await loadWorkerServices(false);
     } catch (error) {
-      console.error("Unable to remove worker service:", error);
+      console.error("Unable to remove worker service offering:", error);
       setServicesError("Unable to remove this service. Please try again.");
     } finally {
       setServiceActionLoading(null);
@@ -657,13 +728,9 @@ useEffect(() => {
   const getCustomerLabel = (booking: Booking) => `Customer #${booking.customerId}`;
 
   const navigateToSection = (sectionId: string) => {
-    setActiveSection(sectionId);
     setSidebarOpen(false);
-
-    document.getElementById(sectionId)?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    });
+    navigate(`/worker/dashboard/${sectionId}`);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const filteredBookings = bookings.filter((booking) => {
@@ -855,8 +922,8 @@ useEffect(() => {
 
             <div>
               <p className="text-sm text-gray-500">Worker Workspace</p>
-              <h1 className="text-lg font-bold text-gray-900 sm:text-xl">
-                Dashboard
+              <h1 className="text-lg font-bold capitalize text-gray-900 sm:text-xl">
+                {activeSection === "bills" ? "My Bills" : activeSection === "bookings" ? "My Bookings" : activeSection === "services" ? "My Services" : activeSection === "reviews" ? "Reviews" : activeSection === "profile" ? "My Profile" : activeSection === "settings" ? "Settings" : "Overview"}
               </h1>
             </div>
           </div>
@@ -900,6 +967,8 @@ useEffect(() => {
             </div>
           )}
 
+{activeSection === "overview" && (
+          <>
           {/* Overview */}
           <section id="overview" className="scroll-mt-28">
             <div className="flex flex-col justify-between gap-5 md:flex-row md:items-center">
@@ -1161,6 +1230,11 @@ useEffect(() => {
             </div>
           </section>
 
+          </>
+          )}
+
+{activeSection === "bookings" && (
+          <>
           {/* Bookings */}
           <section id="bookings" className="scroll-mt-28">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
@@ -1367,6 +1441,13 @@ useEffect(() => {
             </p>
           </section>
 
+          </>
+          )}
+
+          {activeSection === "bills" && <WorkerBillingPanel bookings={bookings} />}
+
+{activeSection === "services" && (
+          <>
           {/* Services */}
           <section id="services" className="scroll-mt-28">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
@@ -1423,11 +1504,11 @@ useEffect(() => {
                 <p className="mt-1 text-sm text-gray-500">
                   Choose a service from the LocalWorker service catalog.
                 </p>
-                <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_180px_auto]">
                   <select
                     value={selectedServiceId}
                     onChange={(event) => setSelectedServiceId(event.target.value)}
-                    className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                    className="min-w-0 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
                   >
                     <option value="">Select a service</option>
                     {availableServices.map((service) => (
@@ -1436,10 +1517,21 @@ useEffect(() => {
                       </option>
                     ))}
                   </select>
+                  <input
+                    type="number"
+                    min="1"
+                    step="0.01"
+                    inputMode="decimal"
+                    value={selectedServicePrice}
+                    onChange={(event) => setSelectedServicePrice(event.target.value)}
+                    placeholder="Price in ₹"
+                    aria-label="Service price in rupees"
+                    className="min-w-0 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                  />
                   <button
                     type="button"
                     onClick={() => void addWorkerService()}
-                    disabled={!selectedServiceId || serviceActionLoading !== null}
+                    disabled={!selectedServiceId || !selectedServicePrice || serviceActionLoading !== null}
                     className="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {serviceActionLoading !== null ? "Adding..." : "Confirm Add"}
@@ -1449,6 +1541,7 @@ useEffect(() => {
                     onClick={() => {
                       setShowAddService(false);
                       setSelectedServiceId("");
+                      setSelectedServicePrice("");
                     }}
                     className="rounded-xl border border-gray-200 px-5 py-3 text-sm font-semibold text-gray-600 transition hover:bg-gray-50"
                   >
@@ -1507,27 +1600,99 @@ useEffect(() => {
                       {service.description || "No description available."}
                     </p>
 
-                    <div className="mt-5 flex items-center justify-between border-t border-gray-100 pt-4">
-                      <span className="text-xs text-gray-400">Service ID: {service.id}</span>
-                      <button
-                        type="button"
-                        onClick={() => void removeWorkerService(service.id)}
-                        disabled={serviceActionLoading !== null}
-                        className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <Trash2 size={15} />
-                        {serviceActionLoading === service.id ? "Removing..." : "Remove"}
-                      </button>
+                    <div className="mt-5 border-t border-gray-100 pt-4">
+                      {editingServiceId === service.id ? (
+                        <div className="space-y-3">
+                          <label className="block text-xs font-semibold text-gray-600">
+                            Update your price (₹)
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            step="0.01"
+                            inputMode="decimal"
+                            value={editingServicePrice}
+                            onChange={(event) => setEditingServicePrice(event.target.value)}
+                            placeholder="Enter price in ₹"
+                            className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                          />
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => void updateWorkerServicePrice(service.id)}
+                              disabled={!editingServicePrice || serviceActionLoading !== null}
+                              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                            >
+                              {serviceActionLoading === service.id ? "Saving..." : "Save price"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingServiceId(null);
+                                setEditingServicePrice("");
+                              }}
+                              disabled={serviceActionLoading !== null}
+                              className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <p className="text-xs text-gray-500">Your service price</p>
+                              {service.price === null ? (
+                                <p className="mt-1 text-sm font-semibold text-amber-600">
+                                  Price not set
+                                </p>
+                              ) : (
+                                <p className="mt-1 text-xl font-bold text-gray-900">
+                                  ₹{service.price.toLocaleString("en-IN", {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })}
+                                </p>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => startEditingServicePrice(service)}
+                              disabled={serviceActionLoading !== null}
+                              className="rounded-lg border border-emerald-200 px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:opacity-50"
+                            >
+                              {service.price === null ? "Set price" : "Edit price"}
+                            </button>
+                          </div>
+                          <div className="mt-4 flex justify-end">
+                            <button
+                              type="button"
+                              onClick={() => void removeWorkerService(service.id)}
+                              disabled={serviceActionLoading !== null}
+                              className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              <Trash2 size={15} />
+                              {serviceActionLoading === service.id ? "Removing..." : "Remove"}
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 ))}
               </div>
             )}
             <p className="mt-4 text-xs text-gray-400">
-              Your assigned services are loaded from the backend service catalog and worker profile.
+Set a price for every service you offer. Customers will only be able to book services with a configured price.
             </p>
           </section>
 
+          </>
+          )}
+
+{activeSection === "reviews" && (
+          <>
           {/* Reviews */}
           <section id="reviews" className="scroll-mt-28">
             <div>
@@ -1646,6 +1811,11 @@ useEffect(() => {
             )}
           </section>
 
+          </>
+          )}
+
+{activeSection === "profile" && (
+          <>
           {/* Profile */}
           <section id="profile" className="scroll-mt-28">
             <div>
@@ -1838,6 +2008,11 @@ useEffect(() => {
             </div>
           </section>
 
+          </>
+          )}
+
+{activeSection === "settings" && (
+          <>
           {/* Settings */}
           <section id="settings" className="scroll-mt-28">
             <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
@@ -1886,6 +2061,9 @@ useEffect(() => {
               </div>
             </div>
           </section>
+
+          </>
+          )}
 
           {profileSuccess && (
             <div role="status" className="fixed right-4 top-24 z-[90] rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-medium text-emerald-800 shadow-lg">

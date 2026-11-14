@@ -3,16 +3,21 @@ package com.localworker.backend.service;
 
 import com.localworker.backend.dto.BookingRequest;
 import com.localworker.backend.dto.BookingResponse;
+
+import com.localworker.backend.model.BillingStatus;
 import com.localworker.backend.model.Booking;
 import com.localworker.backend.model.BookingStatus;
 import com.localworker.backend.model.Role;
 import com.localworker.backend.model.Service;
 import com.localworker.backend.model.User;
 import com.localworker.backend.model.Worker;
+import com.localworker.backend.model.WorkerServiceOffering;
+
 import com.localworker.backend.repository.BookingRepository;
 import com.localworker.backend.repository.ServiceRepository;
 import com.localworker.backend.repository.UserRepository;
 import com.localworker.backend.repository.WorkerRepository;
+import com.localworker.backend.repository.WorkerServiceOfferingRepository;
 
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
@@ -31,19 +36,22 @@ public class BookingService {
     private final WorkerRepository workerRepository;
     private final ServiceRepository serviceRepository;
     private final NotificationService notificationService;
+    private final WorkerServiceOfferingRepository offeringRepository;
 
     public BookingService(
             BookingRepository bookingRepository,
             UserRepository userRepository,
             WorkerRepository workerRepository,
             ServiceRepository serviceRepository,
-            NotificationService notificationService) {
+            NotificationService notificationService,
+            WorkerServiceOfferingRepository offeringRepository) {
 
         this.bookingRepository = bookingRepository;
         this.userRepository = userRepository;
         this.workerRepository = workerRepository;
         this.serviceRepository = serviceRepository;
         this.notificationService = notificationService;
+        this.offeringRepository = offeringRepository;
     }
 
     // Create a booking as the authenticated CUSTOMER
@@ -72,6 +80,31 @@ public class BookingService {
                 .orElseThrow(() ->
                         new RuntimeException("Service not found"));
 
+        // Verify that this worker offers the selected service.
+        WorkerServiceOffering offering = offeringRepository
+                .findByWorker_IdAndService_Id(
+                        worker.getId(),
+                        service.getId()
+                )
+                .orElseThrow(() ->
+                        new IllegalStateException(
+                                "This worker does not offer the selected service"
+                        ));
+
+        // The offering must be active.
+        if (!offering.isActive()) {
+            throw new IllegalStateException(
+                    "This service is currently unavailable from this worker"
+            );
+        }
+
+        // A booking cannot be created without a configured visiting charge.
+        if (offering.getPrice() == null) {
+            throw new IllegalStateException(
+                    "The worker has not configured a visiting charge yet"
+            );
+        }
+
         Booking booking = new Booking();
 
         booking.setScheduledAt(request.getScheduledAt());
@@ -81,6 +114,10 @@ public class BookingService {
         booking.setCustomer(customer);
         booking.setWorker(worker);
         booking.setService(service);
+
+        // Snapshot the visiting charge at booking creation.
+        // Later changes to the worker's charge won't affect this booking.
+        booking.setVisitingCharge(offering.getPrice());
 
         booking.setStatus(BookingStatus.PENDING);
 
@@ -136,6 +173,7 @@ public class BookingService {
         );
 
         booking.setStatus(BookingStatus.ACCEPTED);
+
         Booking savedBooking = bookingRepository.save(booking);
 
         // Notify the customer.
@@ -169,6 +207,7 @@ public class BookingService {
         booking.setStatus(BookingStatus.REJECTED);
         booking.setRejectionReason(reason.trim());
         booking.setRejectedAt(LocalDateTime.now());
+
         Booking savedBooking = bookingRepository.save(booking);
 
         // Notify the customer.
@@ -186,7 +225,8 @@ public class BookingService {
         return convertToResponse(savedBooking);
     }
 
-    // Only the assigned worker or ADMIN can start a booking
+    // Only the assigned worker or ADMIN can start a booking.
+    // Bill approval is intentionally not required to begin work.
     @Transactional
     public BookingResponse startBooking(Long id) {
 
@@ -201,9 +241,9 @@ public class BookingService {
         );
 
         booking.setStatus(BookingStatus.IN_PROGRESS);
+
         Booking savedBooking = bookingRepository.save(booking);
 
-        // Notify the customer.
         notificationService.createNotification(
                 booking.getCustomer(),
                 savedBooking,
@@ -217,7 +257,8 @@ public class BookingService {
         return convertToResponse(savedBooking);
     }
 
-    // Only the assigned worker or ADMIN can complete a booking
+    // Only the assigned worker or ADMIN can complete a booking.
+    // The final bill is submitted after the work is completed.
     @Transactional
     public BookingResponse completeBooking(Long id) {
 
@@ -232,9 +273,9 @@ public class BookingService {
         );
 
         booking.setStatus(BookingStatus.COMPLETED);
+
         Booking savedBooking = bookingRepository.save(booking);
 
-        // Notify the customer.
         notificationService.createNotification(
                 booking.getCustomer(),
                 savedBooking,
@@ -248,13 +289,22 @@ public class BookingService {
         return convertToResponse(savedBooking);
     }
 
-    // Only the customer who owns the booking or ADMIN can cancel it
+    // Only the customer who owns the booking or ADMIN can cancel it.
     @Transactional
     public BookingResponse cancelBooking(Long id, String reason) {
 
         Booking booking = getBookingEntity(id);
 
         authorizeCustomerOrAdmin(booking);
+
+        // Do not allow cancellation after bill submission or approval.
+        if (booking.getBillingStatus() == BillingStatus.PENDING_APPROVAL
+                || booking.getBillingStatus() == BillingStatus.APPROVED) {
+
+            throw new IllegalStateException(
+                    "Booking cannot be cancelled after bill submission"
+            );
+        }
 
         if (booking.getStatus() != BookingStatus.PENDING
                 && booking.getStatus() != BookingStatus.ACCEPTED) {
@@ -267,6 +317,7 @@ public class BookingService {
         booking.setStatus(BookingStatus.CANCELLED);
         booking.setCancellationReason(reason.trim());
         booking.setCancelledAt(LocalDateTime.now());
+
         Booking savedBooking = bookingRepository.save(booking);
 
         // Notify the assigned worker.
@@ -384,7 +435,7 @@ public class BookingService {
         }
     }
 
-    // Only the customer who owns this booking or ADMIN
+    // Only the customer who owns the booking or ADMIN
     private void authorizeCustomerOrAdmin(Booking booking) {
 
         if (isAdmin()) {
@@ -466,6 +517,11 @@ public class BookingService {
 
         response.setProblemDescription(
                 booking.getProblemDescription()
+        );
+
+        // Preserve the booking's visiting-charge snapshot.
+        response.setVisitingCharge(
+                booking.getVisitingCharge()
         );
 
         response.setStatus(

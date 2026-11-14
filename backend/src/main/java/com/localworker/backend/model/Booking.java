@@ -1,8 +1,12 @@
+
 package com.localworker.backend.model;
 
 import jakarta.persistence.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "bookings")
@@ -21,6 +25,7 @@ public class Booking {
     @Enumerated(EnumType.STRING)
     private BookingStatus status;
 
+    // Existing cancellation and rejection details
     @Column(length = 1000)
     private String cancellationReason;
 
@@ -30,6 +35,32 @@ public class Booking {
     private LocalDateTime cancelledAt;
 
     private LocalDateTime rejectedAt;
+
+    // Visiting charge snapshot captured when booking is created
+    @Column(name = "visiting_charge", precision = 10, scale = 2)
+    private BigDecimal visitingCharge;
+
+    // Billing workflow status
+    @Enumerated(EnumType.STRING)
+    @Column(name = "billing_status", length = 30)
+    private BillingStatus billingStatus = BillingStatus.DRAFT;
+
+    // Customer's bill rejection details
+    @Column(length = 1000)
+    private String billRejectionReason;
+
+    private LocalDateTime billSubmittedAt;
+
+    private LocalDateTime billApprovedAt;
+
+    // Itemized additional charges
+    @OneToMany(
+            mappedBy = "booking",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true
+    )
+    @OrderBy("id ASC")
+    private List<BookingCharge> charges = new ArrayList<>();
 
     @ManyToOne
     @JoinColumn(name = "customer_id", nullable = false)
@@ -54,8 +85,8 @@ public class Booking {
             BookingStatus status,
             User customer,
             Worker worker,
-            Service service) {
-
+            Service service
+    ) {
         this.id = id;
         this.scheduledAt = scheduledAt;
         this.address = address;
@@ -64,6 +95,16 @@ public class Booking {
         this.customer = customer;
         this.worker = worker;
         this.service = service;
+    }
+
+    public void addCharge(BookingCharge charge) {
+        charges.add(charge);
+        charge.setBooking(this);
+    }
+
+    public void removeCharge(BookingCharge charge) {
+        charges.remove(charge);
+        charge.setBooking(null);
     }
 
     public Long getId() {
@@ -136,6 +177,54 @@ public class Booking {
 
     public void setRejectedAt(LocalDateTime rejectedAt) {
         this.rejectedAt = rejectedAt;
+    }
+
+    public BigDecimal getVisitingCharge() {
+        return visitingCharge;
+    }
+
+    public void setVisitingCharge(BigDecimal visitingCharge) {
+        this.visitingCharge = visitingCharge;
+    }
+
+    public BillingStatus getBillingStatus() {
+        return billingStatus;
+    }
+
+    public void setBillingStatus(BillingStatus billingStatus) {
+        this.billingStatus = billingStatus;
+    }
+
+    public String getBillRejectionReason() {
+        return billRejectionReason;
+    }
+
+    public void setBillRejectionReason(String billRejectionReason) {
+        this.billRejectionReason = billRejectionReason;
+    }
+
+    public LocalDateTime getBillSubmittedAt() {
+        return billSubmittedAt;
+    }
+
+    public void setBillSubmittedAt(LocalDateTime billSubmittedAt) {
+        this.billSubmittedAt = billSubmittedAt;
+    }
+
+    public LocalDateTime getBillApprovedAt() {
+        return billApprovedAt;
+    }
+
+    public void setBillApprovedAt(LocalDateTime billApprovedAt) {
+        this.billApprovedAt = billApprovedAt;
+    }
+
+    public List<BookingCharge> getCharges() {
+        return charges;
+    }
+
+    public void setCharges(List<BookingCharge> charges) {
+        this.charges = charges;
     }
 
     public User getCustomer() {
