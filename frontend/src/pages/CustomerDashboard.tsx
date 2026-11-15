@@ -128,8 +128,8 @@ const statusStyles: Record<BookingStatus, string> = {
   CANCELLED: "bg-slate-100 text-slate-600",
 };
 
-const formatStatus = (status: BookingStatus) =>
-  status.replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
+const formatStatus = (status?: string | null) =>
+  (status ?? "UNKNOWN").replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
 
 const formatBookingDate = (date: string) => {
   const parsedDate = new Date(date);
@@ -235,7 +235,7 @@ type CustomerBookingBill = {
   charges: CustomerBillCharge[];
   additionalChargesTotal: number;
   totalAmount: number;
-  billingStatus: CustomerBillStatus;
+  billingStatus: CustomerBillStatus | null;
   rejectionReason?: string | null;
   submittedAt?: string | null;
   approvedAt?: string | null;
@@ -388,9 +388,11 @@ function CustomerBillingPanel({ bookings }: { bookings: Booking[] }) {
                     ? "bg-amber-50 text-amber-700"
                     : bill.billingStatus === "APPROVED"
                       ? "bg-emerald-50 text-emerald-700"
-                      : "bg-red-50 text-red-700"
+                      : bill.billingStatus === "REJECTED"
+                        ? "bg-red-50 text-red-700"
+                        : "bg-slate-100 text-slate-600"
                 }`}>
-                  {bill.billingStatus.replaceAll("_", " ")}
+                  {formatStatus(bill.billingStatus)}
                 </span>
               </div>
 
