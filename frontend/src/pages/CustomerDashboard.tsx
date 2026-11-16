@@ -8,7 +8,15 @@ import {
   type FormEvent,
 } from "react";
 
-import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import DashboardLayout, { type DashboardNavItem } from "../components/dashboard/DashboardLayout";
+import CustomerOverview from "./customer/CustomerOverview";
+import CustomerFindWorkers from "./customer/CustomerFindWorkers";
+import CustomerBookings from "./customer/CustomerBookings";
+import CustomerBills from "./customer/CustomerBills";
+import CustomerReviews from "./customer/CustomerReviews";
+import CustomerProfile from "./customer/CustomerProfile";
+import CustomerSettings from "./customer/CustomerSettings";
 import {
   ArrowRight,
   Ban,
@@ -16,29 +24,18 @@ import {
   CalendarDays,
   CheckCircle2,
   ClipboardList,
-  Clock,
   LayoutDashboard,
-  LogOut,
   MapPin,
-  Menu,
   Plus,
-  RefreshCw,
   Search,
   Star,
   UserRound,
   Settings,
-  Wrench,
-  Zap,
-  Paintbrush,
-  Sparkles,
-  Snowflake,
-  Hammer,
   X,
 } from "lucide-react";
 import api from "../api/axios";
-import NotificationBell from "./NotificationBell";
 
-type BookingStatus =
+export type BookingStatus =
   | "PENDING"
   | "ACCEPTED"
   | "IN_PROGRESS"
@@ -46,7 +43,7 @@ type BookingStatus =
   | "REJECTED"
   | "CANCELLED";
 
-type Booking = {
+export type Booking = {
   id: number;
   customerId: number;
   workerId: number;
@@ -70,7 +67,7 @@ type Booking = {
   rejectedAt?: string | null;
 };
 
-type Worker = {
+export type Worker = {
   id: number;
   name: string;
   location: string | null;
@@ -81,14 +78,14 @@ type Worker = {
   services: ServiceOption[];
 };
 
-type ServiceOption = {
+export type ServiceOption = {
   id: number;
   name: string;
   description?: string | null;
   color?: string;
 };
 
-type CustomerProfile = {
+export type CustomerProfile = {
   id: number;
   name: string;
   email: string;
@@ -96,7 +93,7 @@ type CustomerProfile = {
   role: string;
 };
 
-type Review = {
+export type Review = {
   id: number;
   bookingId: number;
   customerId: number;
@@ -107,12 +104,12 @@ type Review = {
   createdAt: string;
 };
 
-type WorkerRating = {
+export type WorkerRating = {
   averageRating: number;
   reviewCount: number;
 };
 
-type BookingForm = {
+export type BookingForm = {
   scheduledAt: string;
   address: string;
   problemDescription: string;
@@ -220,312 +217,6 @@ function BookingStatusTimeline({ status }: { status: BookingStatus }) {
   );
 }
 
-type CustomerBillStatus = "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "REJECTED";
-
-type CustomerBillCharge = {
-  id: number;
-  name: string;
-  description?: string | null;
-  amount: number;
-};
-
-type CustomerBookingBill = {
-  bookingId: number;
-  visitingCharge: number | null;
-  charges: CustomerBillCharge[];
-  additionalChargesTotal: number;
-  totalAmount: number;
-  billingStatus: CustomerBillStatus | null;
-  rejectionReason?: string | null;
-  submittedAt?: string | null;
-  approvedAt?: string | null;
-};
-
-function CustomerBillingPanel({ bookings }: { bookings: Booking[] }) {
-  const [bills, setBills] = useState<Record<number, CustomerBookingBill>>({});
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [actionBookingId, setActionBookingId] = useState<number | null>(null);
-  const [rejectingBookingId, setRejectingBookingId] = useState<number | null>(null);
-  const [rejectionReason, setRejectionReason] = useState("");
-  const [actionError, setActionError] = useState("");
-
-  const eligibleBookings = useMemo(
-    () => bookings.filter((booking) =>
-      booking.status === "COMPLETED"
-    ),
-    [bookings],
-  );
-
-  const loadBills = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const results = await Promise.all(
-        eligibleBookings.map(async (booking) => {
-          try {
-            const response = await api.get<CustomerBookingBill>(`/bookings/${booking.id}/bill`);
-            return [booking.id, response.data] as const;
-          } catch (requestError) {
-            console.error(`Unable to load bill for booking ${booking.id}:`, requestError);
-            return null;
-          }
-        }),
-      );
-
-      const nextBills: Record<number, CustomerBookingBill> = {};
-      for (const result of results) {
-        if (result) nextBills[result[0]] = result[1];
-      }
-      setBills(nextBills);
-    } catch (requestError) {
-      console.error("Unable to load customer bills:", requestError);
-      setError("Unable to load bills. Please refresh and try again.");
-    } finally {
-      setLoading(false);
-    }
-  }, [eligibleBookings]);
-
-  useEffect(() => {
-    void loadBills();
-  }, [loadBills]);
-
-  const approveBill = async (bookingId: number) => {
-    if (actionBookingId !== null) return;
-    setActionBookingId(bookingId);
-    setActionError("");
-    try {
-      await api.put(`/bookings/${bookingId}/bill/approve`);
-      await loadBills();
-    } catch (requestError: any) {
-      console.error("Unable to approve bill:", requestError);
-      setActionError(
-        requestError?.response?.data?.message ||
-        "Unable to approve this bill. Please try again.",
-      );
-    } finally {
-      setActionBookingId(null);
-    }
-  };
-
-  const rejectBill = async () => {
-    if (rejectingBookingId === null || actionBookingId !== null) return;
-    const reason = rejectionReason.trim();
-    if (!reason) {
-      setActionError("Please enter a reason before rejecting the bill.");
-      return;
-    }
-
-    const bookingId = rejectingBookingId;
-    setActionBookingId(bookingId);
-    setActionError("");
-    try {
-      await api.put(`/bookings/${bookingId}/bill/reject`, { reason });
-      setRejectingBookingId(null);
-      setRejectionReason("");
-      await loadBills();
-    } catch (requestError: any) {
-      console.error("Unable to reject bill:", requestError);
-      setActionError(
-        requestError?.response?.data?.message ||
-        "Unable to reject this bill. Please try again.",
-      );
-    } finally {
-      setActionBookingId(null);
-    }
-  };
-
-  const visibleBills = eligibleBookings
-    .map((booking) => ({ booking, bill: bills[booking.id] }))
-    .filter(({ bill }) => bill && bill.billingStatus !== "DRAFT");
-
-  return (
-    <section id="my-bills" className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-6 sm:p-8">
-      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-        <div>
-          <p className="text-sm font-bold uppercase tracking-wide text-emerald-600">Billing & approval</p>
-          <h2 className="mt-2 text-xl font-extrabold text-slate-900 sm:text-2xl">My Bills</h2>
-          <p className="mt-2 text-sm text-slate-500">
-            Review the final itemized bill submitted by your service professional after the work is completed.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => void loadBills()}
-          disabled={loading}
-          className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
-        >
-          <RefreshCw size={16} className={loading ? "animate-spin" : ""} /> Refresh bills
-        </button>
-      </div>
-
-      {error && <p role="alert" className="mt-5 rounded-xl bg-red-50 p-4 text-sm text-red-700">{error}</p>}
-      {actionError && <p role="alert" className="mt-5 rounded-xl bg-red-50 p-4 text-sm text-red-700">{actionError}</p>}
-
-      {loading && visibleBills.length === 0 ? (
-        <p className="py-10 text-center text-sm text-slate-500">Loading bills...</p>
-      ) : visibleBills.length === 0 ? (
-        <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
-          <ClipboardList size={34} className="mx-auto text-slate-400" />
-          <h3 className="mt-3 font-bold text-slate-800">No bills to review yet</h3>
-          <p className="mt-2 text-sm text-slate-500">
-            Once your service professional completes the job and submits the final bill, it will appear here.
-          </p>
-        </div>
-      ) : (
-        <div className="mt-6 space-y-5">
-          {visibleBills.map(({ booking, bill }) => (
-            <article key={booking.id} className="rounded-2xl border border-slate-200 p-5">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <h3 className="font-extrabold text-slate-900">{booking.serviceName}</h3>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Booking #{booking.id} · {booking.workerName || `Worker #${booking.workerId}`}
-                  </p>
-                </div>
-                <span className={`rounded-full px-3 py-1.5 text-xs font-bold ${
-                  bill.billingStatus === "PENDING_APPROVAL"
-                    ? "bg-amber-50 text-amber-700"
-                    : bill.billingStatus === "APPROVED"
-                      ? "bg-emerald-50 text-emerald-700"
-                      : bill.billingStatus === "REJECTED"
-                        ? "bg-red-50 text-red-700"
-                        : "bg-slate-100 text-slate-600"
-                }`}>
-                  {formatStatus(bill.billingStatus)}
-                </span>
-              </div>
-
-              <div className="mt-5 space-y-3">
-                <div className="flex justify-between gap-4 text-sm">
-                  <span className="text-slate-600">Visiting charge</span>
-                  <span className="font-semibold text-slate-900">
-                    ₹{Number(bill.visitingCharge ?? 0).toFixed(2)}
-                  </span>
-                </div>
-                {bill.charges?.map((charge) => (
-                  <div key={charge.id} className="flex justify-between gap-4 text-sm">
-                    <div className="min-w-0">
-                      <p className="font-semibold text-slate-800">{charge.name}</p>
-                      {charge.description && <p className="mt-0.5 text-xs text-slate-500">{charge.description}</p>}
-                    </div>
-                    <span className="shrink-0 font-semibold text-slate-900">₹{Number(charge.amount).toFixed(2)}</span>
-                  </div>
-                ))}
-                <div className="flex justify-between gap-4 border-t border-slate-200 pt-3 text-sm">
-                  <span className="font-semibold text-slate-700">Additional charges</span>
-                  <span className="font-semibold text-slate-900">₹{Number(bill.additionalChargesTotal ?? 0).toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between gap-4 rounded-xl bg-emerald-50 p-4">
-                  <span className="font-extrabold text-emerald-900">Total amount</span>
-                  <span className="text-lg font-extrabold text-emerald-800">₹{Number(bill.totalAmount ?? 0).toFixed(2)}</span>
-                </div>
-              </div>
-
-              {bill.billingStatus === "REJECTED" && bill.rejectionReason && (
-                <div className="mt-4 rounded-xl border border-red-100 bg-red-50 p-4">
-                  <p className="text-sm font-bold text-red-800">Your previous rejection reason</p>
-                  <p className="mt-1 whitespace-pre-wrap text-sm text-red-700">{bill.rejectionReason}</p>
-                  <p className="mt-2 text-xs text-red-600">The worker can revise and submit the bill again.</p>
-                </div>
-              )}
-
-              {bill.billingStatus === "PENDING_APPROVAL" && (
-                <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:justify-end">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setRejectingBookingId(booking.id);
-                      setRejectionReason("");
-                      setActionError("");
-                    }}
-                    disabled={actionBookingId !== null}
-                    className="rounded-xl border border-red-200 px-5 py-3 text-sm font-bold text-red-600 transition hover:bg-red-50 disabled:opacity-50"
-                  >
-                    Reject bill
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void approveBill(booking.id)}
-                    disabled={actionBookingId !== null}
-                    className="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
-                  >
-                    {actionBookingId === booking.id ? "Processing..." : "Approve bill"}
-                  </button>
-                </div>
-              )}
-
-              {bill.billingStatus === "APPROVED" && (
-                <p className="mt-4 flex items-center gap-2 text-sm font-semibold text-emerald-700">
-                  <CheckCircle2 size={17} /> You approved this final bill. Payment can be handled separately.
-                </p>
-              )}
-            </article>
-          ))}
-        </div>
-      )}
-
-      {rejectingBookingId !== null && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4" onClick={() => {
-          if (actionBookingId === null) {
-            setRejectingBookingId(null);
-            setRejectionReason("");
-          }
-        }}>
-          <section
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="reject-customer-bill-title"
-            className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <h2 id="reject-customer-bill-title" className="text-xl font-extrabold text-slate-900">
-              Reject bill for booking #{rejectingBookingId}
-            </h2>
-            <p className="mt-2 text-sm text-slate-500">
-              Explain what needs to be corrected. The worker can revise and submit the bill again.
-            </p>
-            <textarea
-              value={rejectionReason}
-              onChange={(event) => {
-                setRejectionReason(event.target.value);
-                setActionError("");
-              }}
-              maxLength={1000}
-              rows={4}
-              placeholder="Enter your reason..."
-              className="mt-5 w-full resize-y rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-            />
-            <p className="mt-1 text-right text-xs text-slate-400">{rejectionReason.length}/1000</p>
-            <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-              <button
-                type="button"
-                disabled={actionBookingId !== null}
-                onClick={() => {
-                  setRejectingBookingId(null);
-                  setRejectionReason("");
-                }}
-                className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
-              >
-                Keep bill
-              </button>
-              <button
-                type="button"
-                onClick={() => void rejectBill()}
-                disabled={actionBookingId !== null || !rejectionReason.trim()}
-                className="rounded-xl bg-red-600 px-5 py-3 text-sm font-bold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {actionBookingId === rejectingBookingId ? "Submitting..." : "Confirm rejection"}
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
-    </section>
-  );
-}
-
-
 
 function CustomerDashboard() {
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -568,7 +259,6 @@ function CustomerDashboard() {
   const [searchTerm, setSearchTerm] = useState("");
   const [location, setLocation] = useState("");
   const [selectedService, setSelectedService] = useState("All Services");
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const routerLocation = useLocation();
   const navigate = useNavigate();
   const currentSection = routerLocation.pathname.split("/").filter(Boolean).at(-1) ?? "overview";
@@ -1042,722 +732,128 @@ function CustomerDashboard() {
     return `http://localhost:8080${path.startsWith("/") ? path : `/${path}`}`;
   };
 
+  const dashboardNavItems: DashboardNavItem[] = sidebarItems.map((item) => ({
+    label: item.label,
+    path: item.path,
+    icon: item.icon,
+  }));
+
   return (
-    <div className="min-h-screen bg-slate-50">
-      {mobileMenuOpen && (
-        <button
-          type="button"
-          aria-label="Close navigation overlay"
-          className="fixed inset-0 z-40 bg-black/40 lg:hidden"
-          onClick={() => setMobileMenuOpen(false)}
-        />
-      )}
-
-      <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-slate-200 bg-white transition-transform duration-300 lg:translate-x-0 ${
-          mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
-      >
-        <div className="flex h-20 items-center justify-between border-b border-slate-100 px-6">
-          <Link to="/" className="flex items-center gap-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600 text-xl font-black text-white">
-              L
-            </div>
-            <span className="text-xl font-extrabold">
-              Local<span className="text-emerald-600">Worker</span>
-            </span>
-          </Link>
-          <button
-            type="button"
-            aria-label="Close navigation"
-            onClick={() => setMobileMenuOpen(false)}
-            className="rounded-lg p-2 hover:bg-slate-100 lg:hidden"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className="border-b border-slate-100 p-5">
-          <div className="flex items-center gap-3 rounded-2xl bg-emerald-50 p-4">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-600 font-bold text-white">
-              {initials(customerName)}
-            </div>
-            <div className="min-w-0">
-              <p className="truncate font-bold text-slate-900">{customerName}</p>
-              <p className="mt-1 text-xs text-slate-500">Customer dashboard</p>
-            </div>
-          </div>
-        </div>
-
-        <nav className="flex-1 space-y-1 overflow-y-auto p-4">
-          <p className="mb-3 px-3 text-xs font-bold uppercase tracking-widest text-slate-400">
-            Workspace
-          </p>
-          {sidebarItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = currentSection === item.path;
-            return (
-              <NavLink
-                key={item.path}
-                to={`/customer/dashboard/${item.path}`}
-                onClick={() => setMobileMenuOpen(false)}
-                className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-semibold transition ${
-                  isActive
-                    ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/20"
-                    : "text-slate-600 hover:bg-emerald-50 hover:text-emerald-700"
-                }`}
-              >
-                <Icon size={19} />
-                {item.label}
-              </NavLink>
-            );
-          })}
-        </nav>
-
-        <div className="border-t border-slate-100 p-4">
-          <Link
-            to="/"
-            className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold text-slate-600 transition hover:bg-red-50 hover:text-red-600"
-          >
-            <LogOut size={19} />
-            Back to Home
-          </Link>
-        </div>
-      </aside>
-
-      <div className="min-h-screen lg:pl-72">
-        <header className="sticky top-0 z-30 flex h-20 items-center justify-between border-b border-slate-200 bg-white/95 px-5 backdrop-blur sm:px-8">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              aria-label="Open navigation"
-              onClick={() => setMobileMenuOpen(true)}
-              className="rounded-lg p-2 hover:bg-slate-100 lg:hidden"
-            >
-              <Menu size={23} />
-            </button>
-            <div>
-              <p className="text-xs font-medium text-slate-500">CUSTOMER WORKSPACE</p>
-              <h1 className="mt-1 text-lg font-extrabold text-slate-900">{activeSection}</h1>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 sm:gap-5">
-            <NotificationBell />
-            <div className="flex items-center gap-3">
-              <div className="hidden text-right sm:block">
-                <p className="text-sm font-bold">Welcome, {customerName}!</p>
-                <p className="mt-1 text-xs text-slate-500">Customer</p>
-              </div>
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 font-bold text-emerald-700">
-                {initials(customerName)}
-              </div>
-            </div>
-          </div>
-        </header>
-
-        <main className="mx-auto max-w-7xl space-y-8 p-5 sm:p-8">
-          {activeSection === "My Profile" ? (
-            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-              <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
-                <div>
-                  <p className="text-sm font-bold uppercase tracking-wide text-emerald-600">Account settings</p>
-                  <h2 className="mt-2 text-2xl font-extrabold text-slate-900 sm:text-3xl">My Profile</h2>
-                  <p className="mt-2 text-sm text-slate-500">View and manage your personal information.</p>
-                </div>
-                {!profileEditing && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setProfileForm({
-                        name: customerProfile?.name ?? "",
-                        phone: customerProfile?.phone ?? "",
-                      });
-                      setProfileError("");
-                      setProfileSuccess("");
-                      setProfileEditing(true);
-                    }}
-                    disabled={!customerProfile || profileLoading}
-                    className="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Edit Profile
-                  </button>
-                )}
-              </div>
-
-              {profileError && (
-                <div role="alert" className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-                  {profileError}
-                  <button type="button" onClick={() => void loadCustomerProfile()} className="ml-2 font-bold underline">Retry</button>
-                </div>
-              )}
-              {profileSuccess && (
-                <div role="status" className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
-                  {profileSuccess}
-                </div>
-              )}
-
-              {profileLoading ? (
-                <div className="mt-8 rounded-2xl bg-slate-50 p-10 text-center text-sm text-slate-500">Loading your profile...</div>
-              ) : customerProfile ? (
-                <div className="mt-8">
-                  <div className="flex flex-col items-center gap-4 rounded-2xl bg-emerald-50 p-6 sm:flex-row">
-                    <div className="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-600 text-2xl font-extrabold text-white">
-                      {initials(customerProfile.name)}
-                    </div>
-                    <div className="text-center sm:text-left">
-                      <h3 className="text-xl font-extrabold text-slate-900">{customerProfile.name}</h3>
-                      <p className="mt-1 text-sm text-slate-600">{customerProfile.email}</p>
-                      <span className="mt-3 inline-flex rounded-full bg-white px-3 py-1 text-xs font-bold text-emerald-700">
-                        {customerProfile.role}
-                      </span>
-                    </div>
-                  </div>
-
-                  {profileEditing ? (
-                    <form onSubmit={saveCustomerProfile} className="mt-8 space-y-5">
-                      <div>
-                        <label htmlFor="customer-profile-name" className="mb-2 block text-sm font-semibold text-slate-700">Full name</label>
-                        <input
-                          id="customer-profile-name"
-                          type="text"
-                          required
-                          maxLength={100}
-                          value={profileForm.name}
-                          onChange={(event) => setProfileForm((current) => ({ ...current, name: event.target.value }))}
-                          className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-                        />
-                      </div>
-                      <div>
-                        <label htmlFor="customer-profile-email" className="mb-2 block text-sm font-semibold text-slate-700">Email address</label>
-                        <input
-                          id="customer-profile-email"
-                          type="email"
-                          readOnly
-                          value={customerProfile.email}
-                          className="w-full cursor-not-allowed rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500"
-                        />
-                        <p className="mt-1 text-xs text-slate-400">Email cannot be changed here because it identifies your active login session.</p>
-                      </div>
-                      <div>
-                        <label htmlFor="customer-profile-phone" className="mb-2 block text-sm font-semibold text-slate-700">Phone number</label>
-                        <input
-                          id="customer-profile-phone"
-                          type="tel"
-                          maxLength={20}
-                          value={profileForm.phone}
-                          onChange={(event) => setProfileForm((current) => ({ ...current, phone: event.target.value }))}
-                          placeholder="Enter your phone number"
-                          className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-                        />
-                      </div>
-                      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setProfileEditing(false);
-                            setProfileForm({
-                              name: customerProfile.name,
-                              phone: customerProfile.phone ?? "",
-                            });
-                            setProfileError("");
-                          }}
-                          disabled={profileSaving}
-                          className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="submit"
-                          disabled={profileSaving || !profileForm.name.trim()}
-                          className="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          {profileSaving ? "Saving..." : "Save Changes"}
-                        </button>
-                      </div>
-                    </form>
-                  ) : (
-                    <div className="mt-8 grid gap-5 sm:grid-cols-2">
-                      <div className="rounded-xl border border-slate-200 p-5">
-                        <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Full name</p>
-                        <p className="mt-2 font-semibold text-slate-800">{customerProfile.name}</p>
-                      </div>
-                      <div className="rounded-xl border border-slate-200 p-5">
-                        <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Email address</p>
-                        <p className="mt-2 break-all font-semibold text-slate-800">{customerProfile.email}</p>
-                      </div>
-                      <div className="rounded-xl border border-slate-200 p-5">
-                        <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Phone number</p>
-                        <p className="mt-2 font-semibold text-slate-800">{customerProfile.phone || "Not provided"}</p>
-                      </div>
-                      <div className="rounded-xl border border-slate-200 p-5">
-                        <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Account type</p>
-                        <p className="mt-2 font-semibold text-slate-800">{customerProfile.role}</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="mt-8 rounded-2xl bg-slate-50 p-8 text-center text-sm text-slate-500">
-                  Profile information is unavailable.
-                </div>
-              )}
-            </section>
-          ) : activeSection === "My Reviews" ? (
-            <section className="rounded-3xl border border-slate-200 bg-white p-6 sm:p-8">
-              <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
-                <div>
-                  <p className="text-sm font-bold uppercase tracking-wide text-emerald-600">Your feedback</p>
-                  <h2 className="mt-2 text-2xl font-extrabold text-slate-900">My Reviews</h2>
-                  <p className="mt-2 text-sm text-slate-500">Reviews you have submitted for completed bookings.</p>
-                </div>
-                <span className="rounded-full bg-purple-50 px-4 py-2 text-sm font-bold text-purple-700">{myReviews.length} reviews</span>
-              </div>
-              {reviewsError && <p role="alert" className="mt-5 rounded-xl bg-red-50 p-4 text-sm text-red-700">{reviewsError}</p>}
-              {reviewsLoading ? (
-                <p className="py-12 text-center text-sm text-slate-500">Loading your reviews...</p>
-              ) : myReviews.length === 0 ? (
-                <div className="mt-6 rounded-2xl border border-dashed border-slate-300 p-10 text-center">
-                  <Star size={34} className="mx-auto text-slate-300" />
-                  <h3 className="mt-3 font-bold text-slate-800">No reviews yet</h3>
-                  <p className="mt-2 text-sm text-slate-500">After a booking is completed, you can leave a review from My Bookings.</p>
-                </div>
-              ) : (
-                <div className="mt-6 grid gap-4 md:grid-cols-2">
-                  {myReviews.map((review) => (
-                    <article key={review.id} className="rounded-2xl border border-slate-200 p-5">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <h3 className="font-bold text-slate-900">{review.workerName || `Worker #${review.workerId}`}</h3>
-                          <p className="mt-1 text-xs text-slate-400">Booking #{review.bookingId} · {new Date(review.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p>
-                        </div>
-                        <div className="flex items-center gap-1 text-sm font-bold text-amber-600"><Star size={16} className="fill-amber-400 text-amber-400" /> {review.rating}/5</div>
-                      </div>
-                      <div className="mt-4 flex gap-1">{Array.from({ length: 5 }, (_, index) => <Star key={index} size={16} className={index < review.rating ? "fill-amber-400 text-amber-400" : "text-slate-200"} />)}</div>
-                      <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-600">{review.comment || "No written comment."}</p>
-                    </article>
-                  ))}
-                </div>
-              )}
-            </section>
-          ) : activeSection === "Settings" ? (
-            <section className="rounded-3xl border border-slate-200 bg-white p-8">
-              <p className="text-sm font-bold uppercase tracking-wide text-emerald-600">Customer workspace</p>
-              <h2 className="mt-2 text-2xl font-extrabold text-slate-900">Settings</h2>
-              <p className="mt-3 text-sm leading-6 text-slate-500">Account preferences will be available here in a later update.</p>
-            </section>
-          ) : (
+    <DashboardLayout
+      title={activeSection}
+      description="Find trusted professionals and manage your service bookings."
+      navItems={dashboardNavItems}
+      basePath="/customer/dashboard"
+      userName={customerName}
+      roleLabel="Customer"
+      userAvatar={
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-100 font-bold text-emerald-700">
+          {initials(customerName)}
+        </span>
+      }
+    >
+      <div className="space-y-8">
+          {activeSection === "My Profile" && (
+            <CustomerProfile
+              customerProfile={customerProfile}
+              profileEditing={profileEditing}
+              profileLoading={profileLoading}
+              profileError={profileError}
+              profileSuccess={profileSuccess}
+              profileForm={profileForm}
+              profileSaving={profileSaving}
+              setProfileForm={setProfileForm}
+              setProfileError={setProfileError}
+              setProfileSuccess={setProfileSuccess}
+              setProfileEditing={setProfileEditing}
+              loadCustomerProfile={loadCustomerProfile}
+              saveCustomerProfile={saveCustomerProfile}
+              initials={initials}
+            />
+          )}
+          {activeSection === "My Reviews" && (
+            <CustomerReviews
+              myReviews={myReviews}
+              reviewsError={reviewsError}
+              reviewsLoading={reviewsLoading}
+            />
+          )}
+          {activeSection === "Settings" && <CustomerSettings />}
+          {activeSection !== "My Profile" &&
+            activeSection !== "My Reviews" &&
+            activeSection !== "Settings" && (
             <>
           {currentSection === "overview" && (
-            <div className="space-y-8">
-          <section className="relative overflow-hidden rounded-3xl bg-emerald-700 p-7 text-white sm:p-10">
-            <div className="absolute -right-16 -top-20 h-64 w-64 rounded-full bg-emerald-500/40 blur-3xl" />
-            <div className="relative flex flex-col justify-between gap-7 md:flex-row md:items-center">
-              <div className="max-w-2xl">
-                <p className="text-sm font-semibold text-emerald-200">YOUR LOCAL SERVICE COMPANION</p>
-                <h2 className="mt-3 text-3xl font-extrabold leading-tight sm:text-4xl">
-                  Find the right help
-                  <br className="hidden sm:block" /> for your home.
-                </h2>
-                <p className="mt-4 max-w-xl leading-7 text-emerald-100">
-                  Explore local professionals, compare their profiles, and request the services you need.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => navigate("/customer/dashboard/find-workers")}
-                  className="mt-6 inline-flex items-center gap-2 rounded-xl bg-white px-5 py-3 font-bold text-emerald-800 transition hover:bg-emerald-50"
-                >
-                  Find a worker <ArrowRight size={18} />
-                </button>
-              </div>
-              <div className="hidden rounded-3xl border border-white/20 bg-white/10 p-7 md:block">
-                <BriefcaseBusiness size={58} />
-                <p className="mt-4 text-sm text-emerald-100">Your neighbourhood</p>
-                <p className="mt-1 text-xl font-extrabold">Your trusted experts</p>
-              </div>
-            </div>
-          </section>
-
-          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {[
-              { title: "Total Bookings", value: String(bookings.length), subtitle: "Your service requests", icon: CalendarDays, color: "bg-blue-50 text-blue-600" },
-              { title: "Pending Requests", value: String(pendingBookingsCount), subtitle: "Awaiting confirmation", icon: Clock, color: "bg-amber-50 text-amber-600" },
-              { title: "Completed", value: String(completedBookingsCount), subtitle: "Successfully completed", icon: CheckCircle2, color: "bg-emerald-50 text-emerald-600" },
-              { title: "Reviews Given", value: String(myReviews.length), subtitle: "Your feedback", icon: Star, color: "bg-purple-50 text-purple-600" },
-            ].map((card) => {
-              const Icon = card.icon;
-              return (
-                <div key={card.title} className="rounded-2xl border border-slate-200 bg-white p-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-medium text-slate-500">{card.title}</p>
-                      <p className="mt-3 text-3xl font-extrabold">{card.value}</p>
-                    </div>
-                    <div className={`rounded-xl p-3 ${card.color}`}><Icon size={23} /></div>
-                  </div>
-                  <p className="mt-3 text-xs text-slate-400">{card.subtitle}</p>
-                </div>
-              );
-            })}
-          </section>
-
-            </div>
+            <CustomerOverview
+              totalBookings={bookings.length}
+              pendingBookings={pendingBookingsCount}
+              completedBookings={completedBookingsCount}
+              reviewsGiven={myReviews.length}
+              onFindWorkers={() => navigate("/customer/dashboard/find-workers")}
+            />
           )}
 
           {currentSection === "bills" && (
             <div className="space-y-8">
-              <CustomerBillingPanel bookings={bookings} />
+              <CustomerBills bookings={bookings} />
             </div>
           )}
 
           {currentSection === "bookings" && (
-            <div className="space-y-8">
-          <section id="my-bookings" className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-6 sm:p-8">
-            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-              <div>
-                <h2 className="text-xl font-extrabold sm:text-2xl">My Bookings</h2>
-                <p className="mt-2 text-sm text-slate-500">Track your service requests and manage eligible bookings.</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => void loadBookings()}
-                disabled={bookingsLoading}
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
-              >
-                <RefreshCw size={16} className={bookingsLoading ? "animate-spin" : ""} /> Refresh
-              </button>
-            </div>
-
-            <div className="mt-6 space-y-4">
-              <div className="flex flex-wrap gap-2">
-                {[
-                  { value: "ALL", label: "All bookings" },
-                  { value: "ACTIVE", label: "Active" },
-                  { value: "PAST", label: "Past" },
-                ].map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => {
-                      setBookingGroup(option.value);
-                      setShowAllBookings(false);
-                    }}
-                    className={`rounded-xl px-4 py-2 text-sm font-bold transition ${
-                      bookingGroup === option.value
-                        ? "bg-emerald-600 text-white"
-                        : "border border-slate-200 text-slate-600 hover:bg-slate-50"
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-
-              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px_180px]">
-                <div className="flex items-center gap-3 rounded-xl border border-slate-200 px-4">
-                  <Search size={18} className="shrink-0 text-slate-400" />
-                  <input
-                    value={bookingSearch}
-                    onChange={(event) => {
-                      setBookingSearch(event.target.value);
-                      setShowAllBookings(false);
-                    }}
-                    placeholder="Search worker, service or booking ID"
-                    aria-label="Search bookings"
-                    className="w-full py-3 text-sm outline-none"
-                  />
-                </div>
-                <select
-                  value={bookingStatusFilter}
-                  onChange={(event) => {
-                    setBookingStatusFilter(event.target.value);
-                    setShowAllBookings(false);
-                  }}
-                  aria-label="Filter bookings by status"
-                  className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none focus:border-emerald-500"
-                >
-                  <option value="ALL">All statuses</option>
-                  <option value="PENDING">Pending</option>
-                  <option value="ACCEPTED">Accepted</option>
-                  <option value="IN_PROGRESS">In progress</option>
-                  <option value="COMPLETED">Completed</option>
-                  <option value="REJECTED">Rejected</option>
-                  <option value="CANCELLED">Cancelled</option>
-                </select>
-                <select
-                  value={bookingSortOrder}
-                  onChange={(event) => {
-                    setBookingSortOrder(event.target.value);
-                    setShowAllBookings(false);
-                  }}
-                  aria-label="Sort bookings by date"
-                  className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none focus:border-emerald-500"
-                >
-                  <option value="NEWEST">Newest first</option>
-                  <option value="OLDEST">Oldest first</option>
-                </select>
-              </div>
-              <p className="text-xs text-slate-500">
-                Showing {filteredBookings.length} of {bookings.length} bookings
-              </p>
-            </div>
-
-            {bookingsError && (
-              <div role="alert" className="mt-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-                <p>{bookingsError}</p>
-                <button type="button" onClick={() => void loadBookings()} className="mt-2 font-bold underline">Try again</button>
-              </div>
-            )}
-
-            {bookingsLoading ? (
-              <div className="py-12 text-center text-sm text-slate-500">Loading your bookings...</div>
-            ) : filteredBookings.length === 0 ? (
-              <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
-                <CalendarDays size={34} className="mx-auto text-slate-400" />
-                <h3 className="mt-3 font-bold text-slate-800">
-                  {bookings.length === 0 ? "No bookings yet" : "No matching bookings"}
-                </h3>
-                <p className="mt-2 text-sm text-slate-500">
-                  {bookings.length === 0
-                    ? "Your service requests will appear here after you book a worker."
-                    : "Try changing your search or filters to see more bookings."}
-                </p>
-                {bookings.length === 0 && (
-                  <button type="button" onClick={() => navigate("/customer/dashboard/find-workers")} className="mt-4 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-700">Find a worker</button>
-                )}
-              </div>
-            ) : (
-              <div className="mt-6 space-y-4">
-                {visibleBookings.map((booking) => (
-                  <article key={booking.id} className="rounded-2xl border border-slate-200 p-5 transition hover:border-emerald-200">
-                    <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-3">
-                          <h3 className="text-lg font-extrabold text-slate-900">{booking.serviceName || `Service #${booking.serviceId}`}</h3>
-                          <span className={`rounded-full px-3 py-1 text-xs font-bold ${statusStyles[booking.status] || statusStyles.PENDING}`}>{formatStatus(booking.status)}</span>
-                        </div>
-                        <p className="mt-2 text-sm text-slate-500">Booking #{booking.id} · Worker #{booking.workerId}</p>
-                      </div>
-                      {(booking.status === "PENDING" || booking.status === "ACCEPTED") && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setBookingToCancel(booking);
-                            setCancellationReason("");
-                            setCancellationError("");
-                          }}
-                          disabled={cancellingBookingId === booking.id}
-                          className="inline-flex items-center justify-center gap-2 self-start rounded-xl border border-red-200 px-4 py-2.5 text-sm font-bold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          <Ban size={16} /> {cancellingBookingId === booking.id ? "Cancelling..." : "Cancel booking"}
-                        </button>
-                      )}
-                    </div>
-                    <div className="mt-4 flex flex-wrap justify-end gap-2">
-                      {booking.status === "COMPLETED" && (
-                        myReviews.some((review) => review.bookingId === booking.id) ? (
-                          <span className="inline-flex items-center gap-1 rounded-xl bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-700"><CheckCircle2 size={16} /> Reviewed</span>
-                        ) : (
-                          <button type="button" onClick={() => { setReviewBooking(booking); setReviewRating(5); setReviewComment(""); setReviewsError(""); }} className="inline-flex items-center gap-2 rounded-xl bg-amber-50 px-4 py-2 text-sm font-bold text-amber-700 transition hover:bg-amber-100"><Star size={16} /> Write review</button>
-                        )
-                      )}
-                      <button type="button" onClick={() => void openBookingDetails(booking.id)} className="rounded-xl border border-emerald-200 px-4 py-2 text-sm font-bold text-emerald-700 transition hover:bg-emerald-50">
-                        View details
-                      </button>
-                    </div>
-                    <div className="mt-4 grid gap-3 border-t border-slate-100 pt-4 sm:grid-cols-2">
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Scheduled date</p>
-                        <p className="mt-1 flex items-center gap-2 text-sm font-medium text-slate-700"><Clock size={16} className="text-slate-400" />{formatBookingDate(booking.scheduledAt)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Service address</p>
-                        <p className="mt-1 flex items-center gap-2 text-sm font-medium text-slate-700"><MapPin size={16} className="shrink-0 text-slate-400" />{booking.address}</p>
-                      </div>
-                    </div>
-                    {booking.problemDescription && <p className="mt-3 text-sm leading-6 text-slate-600"><span className="font-semibold text-slate-700">Problem: </span>{booking.problemDescription}</p>}
-                  </article>
-                ))}
-                {filteredBookings.length > 3 && (
-                  <div className="flex justify-center pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setShowAllBookings((current) => !current)}
-                      className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 px-5 py-2.5 text-sm font-bold text-emerald-700 transition hover:bg-emerald-50"
-                    >
-                      {showAllBookings ? "Show less" : `View all ${filteredBookings.length} bookings`}
-                      <ArrowRight size={16} className={showAllBookings ? "-rotate-90" : "rotate-90"} />
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </section>
-
-            </div>
+            <CustomerBookings
+              bookings={bookings}
+              bookingsError={bookingsError}
+              bookingsLoading={bookingsLoading}
+              loadBookings={loadBookings}
+              bookingSearch={bookingSearch}
+              setBookingSearch={setBookingSearch}
+              bookingStatusFilter={bookingStatusFilter}
+              setBookingStatusFilter={setBookingStatusFilter}
+              bookingGroup={bookingGroup}
+              setBookingGroup={setBookingGroup}
+              bookingSortOrder={bookingSortOrder}
+              setBookingSortOrder={setBookingSortOrder}
+              filteredBookings={filteredBookings}
+              visibleBookings={visibleBookings}
+              statusStyles={statusStyles}
+              formatStatus={formatStatus}
+              cancellingBookingId={cancellingBookingId}
+              setBookingToCancel={setBookingToCancel}
+              setCancellationReason={setCancellationReason}
+              setCancellationError={setCancellationError}
+              myReviews={myReviews}
+              setReviewBooking={setReviewBooking}
+              setReviewRating={setReviewRating}
+              setReviewComment={setReviewComment}
+              setReviewsError={setReviewsError}
+              openBookingDetails={openBookingDetails}
+              formatBookingDate={formatBookingDate}
+              showAllBookings={showAllBookings}
+              setShowAllBookings={setShowAllBookings}
+              navigate={navigate}
+            />
           )}
 
           {currentSection === "find-workers" && (
-            <div className="space-y-8">
-          <section id="find-workers" className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-6 sm:p-8">
-            <div>
-              <h2 className="text-xl font-extrabold sm:text-2xl">Find local professionals</h2>
-              <p className="mt-2 text-sm text-slate-500">Search real worker profiles registered in LocalWorker.</p>
-            </div>
-            <div className="mt-6 grid gap-4 md:grid-cols-[1fr_1fr_200px_auto]">
-              <div className="flex items-center gap-3 rounded-xl border border-slate-200 px-4">
-                <Search size={19} className="text-slate-400" />
-                <input value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Worker or description" aria-label="Search worker or description" className="w-full py-3.5 text-sm outline-none" />
-              </div>
-              <div className="flex items-center gap-3 rounded-xl border border-slate-200 px-4">
-                <MapPin size={19} className="text-slate-400" />
-                <input value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Enter location" aria-label="Filter workers by location" className="w-full py-3.5 text-sm outline-none" />
-              </div>
-              <select value={selectedService} onChange={(event) => setSelectedService(event.target.value)} aria-label="Filter by service" className="rounded-xl border border-slate-200 bg-white px-4 py-3.5 text-sm outline-none focus:border-emerald-500">
-                <option>All Services</option>
-                {serviceOptions.map((service) => <option key={service.id} value={service.name}>{service.name}</option>)}
-              </select>
-              <button type="button" onClick={() => { setSearchTerm(""); setLocation(""); setSelectedService("All Services"); }} className="rounded-xl bg-emerald-600 px-5 py-3.5 font-bold text-white transition hover:bg-emerald-700">Clear</button>
-            </div>
-          </section>
-
-          <section>
-            <div className="flex items-end justify-between gap-4">
-              <div>
-                <h2 className="text-xl font-extrabold sm:text-2xl">Browse services</h2>
-                <p className="mt-2 text-sm text-slate-500">Choose a category to filter professional profiles.</p>
-              </div>
-            </div>
-            <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-6">
-              {serviceOptions.map((service) => {
-                const normalizedName = service.name.toLowerCase();
-                const Icon =
-                  normalizedName.includes("electric") ? Zap :
-                  normalizedName.includes("plumb") ? Wrench :
-                  normalizedName.includes("paint") ? Paintbrush :
-                  normalizedName.includes("clean") ? Sparkles :
-                  normalizedName.includes("ac") || normalizedName.includes("air condition") ? Snowflake :
-                  normalizedName.includes("carpent") ? Hammer : BriefcaseBusiness;
-                const serviceExists = workers.some((worker) =>
-                  (worker.services ?? []).some((assignedService) => assignedService.id === service.id),
-                );
-                return (
-                  <button
-                    type="button"
-                    key={service.id}
-                    disabled={!serviceExists}
-                    onClick={() => setSelectedService(service.name === selectedService ? "All Services" : service.name)}
-                    className={`rounded-2xl border bg-white p-5 text-left transition hover:-translate-y-1 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-40 ${selectedService === service.name ? "border-emerald-500 ring-2 ring-emerald-100" : "border-slate-200"}`}
-                  >
-                    <div className="inline-flex rounded-xl bg-emerald-50 p-3 text-emerald-600">
-                      <Icon size={24} />
-                    </div>
-                    <p className="mt-4 font-bold">{service.name}</p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {workers.filter((worker) =>
-                        (worker.services ?? []).some((assignedService) => assignedService.id === service.id),
-                      ).length} professionals
-                    </p>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-
-          <section>
-            <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
-              <div>
-                <h2 className="text-xl font-extrabold sm:text-2xl">Local professionals</h2>
-                <p className="mt-2 text-sm text-slate-500">These profiles are loaded directly from the backend.</p>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-semibold text-slate-500">{filteredWorkers.length} professionals found</span>
-                <button type="button" onClick={() => void loadWorkersAndServices()} disabled={workersLoading} aria-label="Refresh workers" className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 disabled:opacity-50">
-                  <RefreshCw size={16} className={workersLoading ? "animate-spin" : ""} />
-                </button>
-              </div>
-            </div>
-
-            {workersError && <div role="alert" className="mt-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{workersError}</div>}
-
-            {workersLoading ? (
-              <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500">Loading professionals...</div>
-            ) : (
-              <div className="mt-5 grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
-                {filteredWorkers.map((worker) => {
-                  const imageUrl = getProfileImageUrl(worker.profileImage);
-                  return (
-                    <article key={worker.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white transition hover:-translate-y-1 hover:shadow-xl">
-                      <div className="flex items-center justify-between border-b border-slate-100 p-5">
-                        <div className="flex min-w-0 items-center gap-4">
-                          {imageUrl ? (
-                            <img src={imageUrl} alt={worker.name} className="h-14 w-14 rounded-2xl object-cover" />
-                          ) : (
-                            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 text-lg font-extrabold text-emerald-700">{initials(worker.name || "Worker")}</div>
-                          )}
-                          <div className="min-w-0">
-                            <h3 className="truncate font-extrabold">{worker.name || `Worker #${worker.id}`}</h3>
-                            <p className="mt-1 line-clamp-2 text-sm text-slate-500">{worker.description || "Local service professional"}</p>
-                          </div>
-                        </div>
-                        <span className={`ml-2 shrink-0 rounded-full px-3 py-1 text-xs font-bold ${worker.available ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
-                          {worker.available ? "Available" : "Unavailable"}
-                        </span>
-                      </div>
-                      <div className="space-y-3 p-5">
-                        <div className="flex items-center gap-2 text-sm text-slate-500">
-                          <MapPin size={16} /> {worker.location || "Location not provided"}
-                        </div>
-                        <p className="text-sm text-slate-600"><span className="font-bold">{worker.experience} years</span> of professional experience</p>
-                        <div className="flex items-center gap-2 text-sm">
-                          <Star size={16} className="fill-amber-400 text-amber-400" />
-                          <span className="font-bold text-slate-800">{(workerRatings[worker.id]?.averageRating ?? 0) > 0 ? workerRatings[worker.id].averageRating.toFixed(1) : "New"}</span>
-                          <span className="text-slate-500">({workerRatings[worker.id]?.reviewCount ?? 0} reviews)</span>
-                        </div>
-                        <div>
-                          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">Services offered</p>
-                          {(worker.services ?? []).length > 0 ? (
-                            <div className="flex flex-wrap gap-2">
-                              {worker.services.map((service) => (
-                                <span key={service.id} className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                                  {service.name}
-                                </span>
-                              ))}
-                            </div>
-                          ) : (
-                            <p className="text-sm text-slate-400">No services added yet</p>
-                          )}
-                        </div>
-                        <div className="flex flex-col gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
-                          <span className="text-xs text-slate-400">Worker ID: {worker.id}</span>
-                          <div className="flex gap-2">
-                            <button type="button" onClick={() => void openWorkerProfile(worker)} className="flex-1 rounded-xl border border-emerald-200 px-3 py-3 text-sm font-bold text-emerald-700 transition hover:bg-emerald-50">View Profile</button>
-                            <button
-                              type="button"
-                              disabled={!worker.available || (worker.services ?? []).length === 0}
-                              onClick={() => openBookingForm(worker)}
-                              className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3 py-3 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
-                            >
-                              Book Now <ArrowRight size={16} />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </article>
-                  );
-                })}
-                {filteredWorkers.length === 0 && (
-                  <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center lg:col-span-2 xl:col-span-3">
-                    <Search size={35} className="mx-auto text-slate-400" />
-                    <h3 className="mt-4 font-bold">No professionals found</h3>
-                    <p className="mt-2 text-sm text-slate-500">{workers.length === 0 ? "No worker profiles have been registered yet." : "Try a different name, service, or location."}</p>
-                    <button type="button" onClick={() => { setSearchTerm(""); setLocation(""); setSelectedService("All Services"); }} className="mt-4 font-bold text-emerald-700 hover:text-emerald-800">Clear filters</button>
-                  </div>
-                )}
-              </div>
-            )}
-          </section>
-
-            </div>
+            <CustomerFindWorkers
+              workers={workers}
+              workersLoading={workersLoading}
+              workersError={workersError}
+              filteredWorkers={filteredWorkers}
+              searchTerm={searchTerm}
+              setSearchTerm={setSearchTerm}
+              location={location}
+              setLocation={setLocation}
+              selectedService={selectedService}
+              setSelectedService={setSelectedService}
+              serviceOptions={serviceOptions}
+              workerRatings={workerRatings}
+              getProfileImageUrl={getProfileImageUrl}
+              initials={initials}
+              openWorkerProfile={openWorkerProfile}
+              openBookingForm={openBookingForm}
+              loadWorkersAndServices={loadWorkersAndServices}
+            />
           )}
 
           {selectedWorkerProfile && (
@@ -2049,9 +1145,8 @@ function CustomerDashboard() {
           </footer>
             </>
           )}
-        </main>
       </div>
-    </div>
+    </DashboardLayout>
   );
 }
 
