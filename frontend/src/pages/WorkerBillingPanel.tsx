@@ -12,6 +12,10 @@ import {
   CheckCircle2,
   Clock,
   AlertCircle,
+  IndianRupee,
+  FileText,
+  Wallet,
+  ChevronUp,
 } from "lucide-react";
 
 type BookingStatus =
@@ -76,9 +80,16 @@ const currency = (amount: number) =>
 
 const statusStyles: Record<BillingStatus, string> = {
   DRAFT: "bg-slate-100 text-slate-700",
-  PENDING_APPROVAL: "bg-amber-100 text-amber-800",
-  APPROVED: "bg-emerald-100 text-emerald-800",
-  REJECTED: "bg-red-100 text-red-700",
+  PENDING_APPROVAL: "bg-amber-50 text-amber-700",
+  APPROVED: "bg-emerald-50 text-emerald-700",
+  REJECTED: "bg-red-50 text-red-700",
+};
+
+const statusLabels: Record<BillingStatus, string> = {
+  DRAFT: "Draft",
+  PENDING_APPROVAL: "Pending approval",
+  APPROVED: "Approved",
+  REJECTED: "Rejected",
 };
 
 function WorkerBillingPanel({ bookings }: WorkerBillingPanelProps) {
@@ -101,6 +112,8 @@ function WorkerBillingPanel({ bookings }: WorkerBillingPanelProps) {
   const [editingChargeId, setEditingChargeId] =
     useState<number | null>(null);
 
+  const [showChargeForm, setShowChargeForm] = useState(false);
+
   const acceptedBookings = bookings.filter(
     (booking) =>
       booking.status === "ACCEPTED" ||
@@ -120,6 +133,10 @@ function WorkerBillingPanel({ bookings }: WorkerBillingPanelProps) {
     (bill.billingStatus === "DRAFT" ||
       bill.billingStatus === "REJECTED");
 
+  const selectedBooking = bookings.find(
+    (booking) => booking.id === selectedBookingId,
+  );
+
   const loadBill = async (bookingId: number) => {
     try {
       setLoading(true);
@@ -133,6 +150,7 @@ function WorkerBillingPanel({ bookings }: WorkerBillingPanelProps) {
       setBill(response.data);
       setSelectedBookingId(bookingId);
       setEditingChargeId(null);
+      setShowChargeForm(false);
 
       setForm({
         name: "",
@@ -159,6 +177,7 @@ function WorkerBillingPanel({ bookings }: WorkerBillingPanelProps) {
     });
 
     setEditingChargeId(null);
+    setShowChargeForm(false);
   };
 
   const closeBill = () => {
@@ -171,7 +190,9 @@ function WorkerBillingPanel({ bookings }: WorkerBillingPanelProps) {
     resetForm();
   };
 
-  const handleAddCharge = async (event: FormEvent<HTMLFormElement>) => {
+  const handleAddCharge = async (
+    event: FormEvent<HTMLFormElement>,
+  ) => {
     event.preventDefault();
 
     if (!selectedBookingId || !isEditable || saving) return;
@@ -241,6 +262,7 @@ function WorkerBillingPanel({ bookings }: WorkerBillingPanelProps) {
     if (!isEditable) return;
 
     setEditingChargeId(charge.id);
+    setShowChargeForm(true);
 
     setForm({
       name: charge.name,
@@ -289,15 +311,13 @@ function WorkerBillingPanel({ bookings }: WorkerBillingPanelProps) {
     }
   };
 
-  const selectedBooking = bookings.find(
-    (booking) => booking.id === selectedBookingId,
-  );
-
   const submitBill = async () => {
     if (!selectedBookingId || !isEditable || saving) return;
 
     if (selectedBooking?.status !== "COMPLETED") {
-      setError("You can submit the final bill only after completing the job.");
+      setError(
+        "You can submit the final bill only after completing the job.",
+      );
       return;
     }
 
@@ -325,7 +345,9 @@ function WorkerBillingPanel({ bookings }: WorkerBillingPanelProps) {
 
       resetForm();
 
-      setSuccess("Bill submitted to the customer successfully.");
+      setSuccess(
+        "Bill submitted to the customer successfully.",
+      );
     } catch (err: any) {
       console.error("Unable to submit bill:", err);
 
@@ -339,426 +361,588 @@ function WorkerBillingPanel({ bookings }: WorkerBillingPanelProps) {
   };
 
   return (
-    <section className="mt-8 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+    <section className="mt-8 space-y-6">
+      {/* Header */}
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <div className="flex items-center gap-2">
-            <Receipt className="text-emerald-600" size={22} />
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
+              <Receipt size={22} />
+            </div>
 
-            <h2 className="text-xl font-bold text-gray-900">
-              Billing Management
-            </h2>
+            <div>
+              <h2 className="text-xl font-bold tracking-tight text-slate-900">
+                Billing Management
+              </h2>
+              <p className="mt-0.5 text-sm text-slate-500">
+                Manage job charges and customer bills
+              </p>
+            </div>
           </div>
-
-          <p className="mt-1 text-sm text-gray-500">
-            Prepare charges during the job and submit the final bill after completion.
-          </p>
         </div>
 
-        <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
-          {acceptedBookings.length} active bookings
-        </span>
+        <div className="flex items-center gap-2 self-start rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-2.5">
+          <FileText size={16} className="text-emerald-700" />
+          <span className="text-sm font-semibold text-emerald-800">
+            {acceptedBookings.length} billable bookings
+          </span>
+        </div>
       </div>
 
+      {/* Booking list */}
       {acceptedBookings.length === 0 ? (
-        <div className="mt-6 rounded-xl border border-dashed border-gray-200 p-8 text-center">
-          <Receipt className="mx-auto text-gray-300" size={36} />
+        <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-14 text-center">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-50">
+            <Receipt size={30} className="text-slate-300" />
+          </div>
 
-          <p className="mt-3 font-semibold text-gray-700">
-            No active bookings
-          </p>
+          <h3 className="mt-4 font-bold text-slate-800">
+            No billable bookings yet
+          </h3>
 
-          <p className="mt-1 text-sm text-gray-500">
-            In-progress and completed bookings will appear here for billing management.
+          <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-slate-500">
+            Accepted, in-progress and completed bookings will
+            appear here when they are ready for billing.
           </p>
         </div>
       ) : (
-        <div className="mt-6 space-y-3">
-          {acceptedBookings.map((booking) => (
-            <div
-              key={booking.id}
-              className="flex flex-col justify-between gap-3 rounded-xl border border-gray-100 p-4 sm:flex-row sm:items-center"
-            >
-              <div>
-                <p className="font-semibold text-gray-900">
-                  {booking.serviceName}
-                </p>
+        <div className="grid gap-4">
+          {acceptedBookings.map((booking) => {
+            const isSelected = selectedBookingId === booking.id;
 
-                <p className="mt-1 text-sm text-gray-500">
-                  {booking.customerName ||
-                    `Customer #${booking.customerId}`}
-                </p>
-
-                <p className="mt-1 text-xs text-gray-400">
-                  Booking #{booking.id}
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  if (selectedBookingId === booking.id) {
-                    closeBill();
-                  } else {
-                    void loadBill(booking.id);
-                  }
-                }}
-                disabled={loading || saving}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+            return (
+              <div
+                key={booking.id}
+                className={`rounded-2xl border bg-white p-5 transition ${
+                  isSelected
+                    ? "border-emerald-300 shadow-md shadow-emerald-900/5"
+                    : "border-slate-200 shadow-sm hover:border-slate-300"
+                }`}
               >
-                <Receipt size={16} />
+                <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-slate-600">
+                      <Receipt size={20} />
+                    </div>
 
-                {selectedBookingId === booking.id
-                  ? "Close bill"
-                  : "Manage bill"}
-              </button>
-            </div>
-          ))}
+                    <div className="min-w-0">
+                      <h3 className="truncate font-bold text-slate-900">
+                        {booking.serviceName}
+                      </h3>
+
+                      <p className="mt-1 text-sm text-slate-500">
+                        {booking.customerName ||
+                          `Customer #${booking.customerId}`}
+                      </p>
+
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <span className="text-xs text-slate-400">
+                          Booking #{booking.id}
+                        </span>
+
+                        <span className="h-1 w-1 rounded-full bg-slate-300" />
+
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                            booking.status === "COMPLETED"
+                              ? "bg-emerald-50 text-emerald-700"
+                              : booking.status === "IN_PROGRESS"
+                                ? "bg-blue-50 text-blue-700"
+                                : "bg-amber-50 text-amber-700"
+                          }`}
+                        >
+                          {booking.status.replaceAll("_", " ")}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (isSelected) {
+                        closeBill();
+                      } else {
+                        void loadBill(booking.id);
+                      }
+                    }}
+                    disabled={loading || saving}
+                    className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                      isSelected
+                        ? "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                        : "bg-emerald-700 text-white hover:bg-emerald-800"
+                    }`}
+                  >
+                    {isSelected ? (
+                      <>
+                        <ChevronUp size={17} />
+                        Close bill
+                      </>
+                    ) : (
+                      <>
+                        <Receipt size={17} />
+                        Manage bill
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
+      {/* Loading */}
       {loading && (
-        <div className="mt-5 flex items-center justify-center gap-2 py-8 text-sm text-gray-500">
-          <RefreshCw size={17} className="animate-spin" />
-          Loading bill...
+        <div className="flex items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white py-12 text-sm font-medium text-slate-500">
+          <RefreshCw size={19} className="animate-spin text-emerald-600" />
+          Loading billing information...
         </div>
       )}
 
+      {/* Error */}
       {error && !loading && (
         <div
           role="alert"
-          className="mt-5 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+          className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
         >
-          <AlertCircle size={18} className="mt-0.5 shrink-0" />
-          {error}
+          <AlertCircle size={19} className="mt-0.5 shrink-0" />
+          <span>{error}</span>
         </div>
       )}
 
+      {/* Selected bill */}
       {bill && selectedBooking && !loading && (
-        <div className="mt-6 rounded-2xl border border-emerald-100 bg-slate-50 p-5">
-          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">
-                Booking #{bill.bookingId}
-              </p>
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          {/* Bill heading */}
+          <div className="border-b border-slate-100 bg-slate-50/80 p-5 sm:p-6">
+            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+              <div>
+                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-700">
+                  <Receipt size={15} />
+                  Booking #{bill.bookingId}
+                </div>
 
-              <h3 className="mt-1 text-xl font-bold text-gray-900">
-                {selectedBooking.serviceName} Bill
-              </h3>
+                <h3 className="mt-2 text-xl font-bold text-slate-900">
+                  {selectedBooking.serviceName} Bill
+                </h3>
 
-              <p className="mt-1 text-sm text-gray-500">
-                {selectedBooking.customerName ||
-                  `Customer #${selectedBooking.customerId}`}
-              </p>
+                <p className="mt-1 text-sm text-slate-500">
+                  {selectedBooking.customerName ||
+                    `Customer #${selectedBooking.customerId}`}
+                </p>
+              </div>
+
+              <span
+                className={`inline-flex items-center gap-2 self-start rounded-full px-3 py-2 text-xs font-bold ${statusStyles[bill.billingStatus]}`}
+              >
+                {bill.billingStatus === "APPROVED" ? (
+                  <CheckCircle2 size={15} />
+                ) : (
+                  <Clock size={15} />
+                )}
+                {statusLabels[bill.billingStatus]}
+              </span>
             </div>
+          </div>
 
-            <span
-              className={`inline-flex items-center gap-1.5 self-start rounded-full px-3 py-1.5 text-xs font-bold ${statusStyles[bill.billingStatus]}`}
-            >
-              {bill.billingStatus === "APPROVED" ? (
-                <CheckCircle2 size={14} />
-              ) : (
-                <Clock size={14} />
+          <div className="space-y-6 p-5 sm:p-6">
+            {/* Rejection notice */}
+            {bill.billingStatus === "REJECTED" &&
+              bill.rejectionReason && (
+                <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+                  <div className="flex items-center gap-2 font-bold text-red-800">
+                    <AlertCircle size={18} />
+                    Customer's rejection reason
+                  </div>
+
+                  <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-red-700">
+                    {bill.rejectionReason}
+                  </p>
+
+                  <p className="mt-2 text-xs font-medium text-red-600">
+                    Revise the charges and submit the bill again.
+                  </p>
+                </div>
               )}
 
-              {bill.billingStatus.replaceAll("_", " ")}
-            </span>
-          </div>
-
-          {bill.billingStatus === "REJECTED" &&
-            bill.rejectionReason && (
-              <div className="mt-5 rounded-xl border border-red-200 bg-red-50 p-4">
-                <p className="text-sm font-bold text-red-800">
-                  Customer's rejection reason
-                </p>
-
-                <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-red-700">
-                  {bill.rejectionReason}
-                </p>
-
-                <p className="mt-2 text-xs text-red-600">
-                  Revise the charges and submit the bill again.
-                </p>
-              </div>
-            )}
-
-          <div className="mt-5 rounded-xl bg-white p-4">
-            <div className="flex justify-between gap-3 text-sm">
-              <span className="text-gray-600">Visiting charge</span>
-
-              <span className="font-semibold text-gray-900">
-                {currency(bill.visitingCharge)}
-              </span>
-            </div>
-
-            <div className="mt-3 flex justify-between gap-3 text-sm">
-              <span className="text-gray-600">
-                Additional charges
-              </span>
-
-              <span className="font-semibold text-gray-900">
-                {currency(bill.additionalChargesTotal)}
-              </span>
-            </div>
-
-            <div className="mt-4 border-t border-gray-100 pt-4">
-              <div className="flex justify-between gap-3">
-                <span className="font-bold text-gray-900">
-                  Total bill
-                </span>
-
-                <span className="text-xl font-extrabold text-emerald-700">
-                  {currency(bill.totalAmount)}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-5">
-            <div className="flex items-center justify-between gap-3">
-              <h4 className="font-bold text-gray-900">
-                Additional charge items
-              </h4>
-
-              <span className="text-xs text-gray-500">
-                {bill.charges.length} items
-              </span>
-            </div>
-
-            {bill.charges.length === 0 ? (
-              <p className="mt-3 rounded-xl border border-dashed border-gray-200 bg-white p-5 text-center text-sm text-gray-500">
-                No additional charges added yet.
-              </p>
-            ) : (
-              <div className="mt-3 space-y-3">
-                {bill.charges.map((charge) => (
-                  <div
-                    key={charge.id}
-                    className="flex flex-col justify-between gap-3 rounded-xl border border-gray-200 bg-white p-4 sm:flex-row sm:items-center"
-                  >
-                    <div className="min-w-0">
-                      <p className="font-semibold text-gray-900">
-                        {charge.name}
-                      </p>
-
-                      {charge.description && (
-                        <p className="mt-1 whitespace-pre-wrap text-sm text-gray-500">
-                          {charge.description}
-                        </p>
-                      )}
-
-                      <p className="mt-2 font-bold text-gray-900">
-                        {currency(charge.amount)}
-                      </p>
-                    </div>
-
-                    {isEditable && (
-                      <div className="flex shrink-0 items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => startEditing(charge)}
-                          disabled={saving}
-                          title="Edit charge"
-                          className="rounded-lg border border-gray-200 p-2 text-blue-700 hover:bg-blue-50 disabled:opacity-50"
-                        >
-                          <Pencil size={16} />
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => void deleteCharge(charge.id)}
-                          disabled={saving}
-                          title="Delete charge"
-                          className="rounded-lg border border-gray-200 p-2 text-red-600 hover:bg-red-50 disabled:opacity-50"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {isEditable && (
-            <div className="mt-6 rounded-xl border border-emerald-100 bg-white p-5">
-              <div className="flex items-center gap-2">
-                {editingChargeId ? (
-                  <Pencil size={18} className="text-emerald-700" />
-                ) : (
-                  <Plus size={18} className="text-emerald-700" />
-                )}
-
-                <h4 className="font-bold text-gray-900">
-                  {editingChargeId
-                    ? "Edit charge"
-                    : "Add additional charge"}
+            {/* Bill summary */}
+            <div>
+              <div className="mb-3 flex items-center gap-2">
+                <Wallet size={18} className="text-emerald-700" />
+                <h4 className="font-bold text-slate-900">
+                  Bill summary
                 </h4>
               </div>
 
-              <form
-                onSubmit={handleAddCharge}
-                className="mt-4 space-y-4"
-              >
-                <div>
-                  <label
-                    htmlFor="worker-charge-name"
-                    className="mb-1.5 block text-sm font-semibold text-gray-700"
-                  >
-                    Charge name
-                  </label>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-5">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between gap-3 text-sm">
+                    <span className="text-slate-500">
+                      Visiting charge
+                    </span>
+                    <span className="font-semibold text-slate-900">
+                      {currency(bill.visitingCharge)}
+                    </span>
+                  </div>
 
-                  <input
-                    id="worker-charge-name"
-                    type="text"
-                    required
-                    maxLength={150}
-                    value={form.name}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        name: event.target.value,
-                      }))
-                    }
-                    placeholder="e.g. Switch Replacement"
-                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-                  />
+                  <div className="flex items-center justify-between gap-3 text-sm">
+                    <span className="text-slate-500">
+                      Additional charges
+                    </span>
+                    <span className="font-semibold text-slate-900">
+                      {currency(bill.additionalChargesTotal)}
+                    </span>
+                  </div>
+
+                  <div className="border-t border-slate-200 pt-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="font-bold text-slate-900">
+                          Total bill
+                        </p>
+                        <p className="mt-0.5 text-xs text-slate-500">
+                          Final amount payable
+                        </p>
+                      </div>
+
+                      <p className="text-2xl font-extrabold tracking-tight text-emerald-700">
+                        {currency(bill.totalAmount)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Additional charges */}
+            <div>
+              <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+                <div>
+                  <h4 className="font-bold text-slate-900">
+                    Additional charge items
+                  </h4>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Itemized expenses for this booking
+                  </p>
                 </div>
 
-                <div>
-                  <label
-                    htmlFor="worker-charge-description"
-                    className="mb-1.5 block text-sm font-semibold text-gray-700"
-                  >
-                    Description
-                  </label>
+                <span className="self-start rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600">
+                  {bill.charges.length} items
+                </span>
+              </div>
 
-                  <textarea
-                    id="worker-charge-description"
-                    rows={3}
-                    maxLength={500}
-                    value={form.description}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        description: event.target.value,
-                      }))
-                    }
-                    placeholder="Explain what this charge is for"
-                    className="w-full resize-y rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+              {bill.charges.length === 0 ? (
+                <div className="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-center">
+                  <FileText
+                    size={25}
+                    className="mx-auto text-slate-300"
                   />
+                  <p className="mt-2 text-sm font-semibold text-slate-600">
+                    No additional charges
+                  </p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    Added expenses will appear here.
+                  </p>
                 </div>
+              ) : (
+                <div className="mt-4 space-y-3">
+                  {bill.charges.map((charge) => (
+                    <div
+                      key={charge.id}
+                      className="flex flex-col justify-between gap-3 rounded-xl border border-slate-200 p-4 sm:flex-row sm:items-center"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-semibold text-slate-900">
+                          {charge.name}
+                        </p>
 
-                <div>
-                  <label
-                    htmlFor="worker-charge-amount"
-                    className="mb-1.5 block text-sm font-semibold text-gray-700"
-                  >
-                    Amount (₹)
-                  </label>
+                        {charge.description && (
+                          <p className="mt-1 whitespace-pre-wrap text-sm leading-5 text-slate-500">
+                            {charge.description}
+                          </p>
+                        )}
 
-                  <input
-                    id="worker-charge-amount"
-                    type="number"
-                    required
-                    min="0.01"
-                    max="99999999.99"
-                    step="0.01"
-                    value={form.amount}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        amount: event.target.value,
-                      }))
-                    }
-                    placeholder="Enter amount"
-                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-                  />
+                        <p className="mt-2 text-sm font-bold text-emerald-700">
+                          {currency(charge.amount)}
+                        </p>
+                      </div>
+
+                      {isEditable && (
+                        <div className="flex shrink-0 items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => startEditing(charge)}
+                            disabled={saving}
+                            title="Edit charge"
+                            className="rounded-lg border border-slate-200 p-2.5 text-blue-700 transition hover:border-blue-200 hover:bg-blue-50 disabled:opacity-50"
+                          >
+                            <Pencil size={16} />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void deleteCharge(charge.id)
+                            }
+                            disabled={saving}
+                            title="Delete charge"
+                            className="rounded-lg border border-slate-200 p-2.5 text-red-600 transition hover:border-red-200 hover:bg-red-50 disabled:opacity-50"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
+              )}
+            </div>
 
-                <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                  {editingChargeId && (
+            {/* Add charge section */}
+            {isEditable && (
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50/30 p-5">
+                <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                  <div>
+                    <h4 className="font-bold text-slate-900">
+                      {editingChargeId
+                        ? "Edit charge"
+                        : "Additional expenses"}
+                    </h4>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Add any extra materials, parts or service costs.
+                    </p>
+                  </div>
+
+                  {!showChargeForm && (
                     <button
                       type="button"
-                      onClick={resetForm}
-                      disabled={saving}
-                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                      onClick={() => {
+                        setShowChargeForm(true);
+                        setError("");
+                        setSuccess("");
+                      }}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-800"
                     >
-                      <X size={16} />
-                      Cancel edit
+                      <Plus size={17} />
+                      Add charge
                     </button>
                   )}
-
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
-                  >
-                    <Plus size={16} />
-                    {saving
-                      ? "Saving..."
-                      : editingChargeId
-                        ? "Update charge"
-                        : "Add charge"}
-                  </button>
                 </div>
-              </form>
-            </div>
-          )}
 
-          {bill.billingStatus === "PENDING_APPROVAL" && (
-            <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-              Your bill has been submitted. Waiting for customer approval.
-            </div>
-          )}
+                {showChargeForm && (
+                  <form
+                    onSubmit={handleAddCharge}
+                    className="mt-5 space-y-4"
+                  >
+                    <div>
+                      <label
+                        htmlFor="worker-charge-name"
+                        className="mb-1.5 block text-sm font-semibold text-slate-700"
+                      >
+                        Charge name
+                      </label>
 
-          {bill.billingStatus === "APPROVED" && (
-            <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
-              The customer has approved this final bill.
-            </div>
-          )}
+                      <input
+                        id="worker-charge-name"
+                        type="text"
+                        required
+                        maxLength={150}
+                        value={form.name}
+                        onChange={(event) =>
+                          setForm((current) => ({
+                            ...current,
+                            name: event.target.value,
+                          }))
+                        }
+                        placeholder="e.g. Switch Replacement"
+                        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                      />
+                    </div>
 
-          {isEditable && (
-            <div className="mt-6 flex flex-col justify-between gap-3 border-t border-gray-200 pt-5 sm:flex-row sm:items-center">
-              <p className="text-xs leading-5 text-gray-500">
-                Review all charges carefully. You can submit the final bill once the job is completed.
+                    <div>
+                      <label
+                        htmlFor="worker-charge-description"
+                        className="mb-1.5 block text-sm font-semibold text-slate-700"
+                      >
+                        Description
+                      </label>
+
+                      <textarea
+                        id="worker-charge-description"
+                        rows={3}
+                        maxLength={500}
+                        value={form.description}
+                        onChange={(event) =>
+                          setForm((current) => ({
+                            ...current,
+                            description: event.target.value,
+                          }))
+                        }
+                        placeholder="Explain what this charge is for"
+                        className="w-full resize-y rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                      />
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor="worker-charge-amount"
+                        className="mb-1.5 block text-sm font-semibold text-slate-700"
+                      >
+                        Amount (₹)
+                      </label>
+
+                      <div className="relative">
+                        <IndianRupee
+                          size={17}
+                          className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                        />
+                        <input
+                          id="worker-charge-amount"
+                          type="number"
+                          required
+                          min="0.01"
+                          max="99999999.99"
+                          step="0.01"
+                          value={form.amount}
+                          onChange={(event) =>
+                            setForm((current) => ({
+                              ...current,
+                              amount: event.target.value,
+                            }))
+                          }
+                          placeholder="Enter amount"
+                          className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                      <button
+                        type="button"
+                        onClick={resetForm}
+                        disabled={saving}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+                      >
+                        <X size={16} />
+                        Cancel
+                      </button>
+
+                      <button
+                        type="submit"
+                        disabled={saving}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-5 py-3 text-sm font-bold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {saving ? (
+                          <RefreshCw
+                            size={16}
+                            className="animate-spin"
+                          />
+                        ) : editingChargeId ? (
+                          <Pencil size={16} />
+                        ) : (
+                          <Plus size={16} />
+                        )}
+
+                        {saving
+                          ? "Saving..."
+                          : editingChargeId
+                            ? "Update charge"
+                            : "Save charge"}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            )}
+
+            {/* Billing status notices */}
+            {bill.billingStatus === "PENDING_APPROVAL" && (
+              <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <Clock
+                  size={19}
+                  className="mt-0.5 shrink-0 text-amber-700"
+                />
+                <div>
+                  <p className="text-sm font-bold text-amber-900">
+                    Waiting for customer approval
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-amber-800">
+                    Your bill has been submitted successfully. The
+                    customer needs to review and approve it.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {bill.billingStatus === "APPROVED" && (
+              <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                <CheckCircle2
+                  size={19}
+                  className="mt-0.5 shrink-0 text-emerald-700"
+                />
+                <div>
+                  <p className="text-sm font-bold text-emerald-900">
+                    Bill approved!
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-emerald-800">
+                    The customer has approved this final bill.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Submit bill */}
+            {isEditable && (
+              <div className="flex flex-col justify-between gap-4 border-t border-slate-100 pt-5 sm:flex-row sm:items-center">
+                <div>
+                  <p className="text-sm font-semibold text-slate-800">
+                    Ready to submit?
+                  </p>
+                  <p className="mt-1 max-w-md text-xs leading-5 text-slate-500">
+                    Review all charges carefully. You can submit
+                    the final bill once the job is completed.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => void submitBill()}
+                  disabled={
+                    saving ||
+                    bill.visitingCharge == null ||
+                    selectedBooking.status !== "COMPLETED"
+                  }
+                  className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-5 py-3 text-sm font-bold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Send size={17} />
+                  {saving ? "Submitting..." : "Submit final bill"}
+                </button>
+              </div>
+            )}
+
+            {/* Success message */}
+            {success && (
+              <p
+                role="status"
+                className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-medium text-emerald-800"
+              >
+                {success}
               </p>
+            )}
 
+            {/* Close */}
+            <div className="flex justify-end border-t border-slate-100 pt-4">
               <button
                 type="button"
-                onClick={() => void submitBill()}
-                disabled={
-                  saving ||
-                  bill.visitingCharge == null ||
-                  selectedBooking?.status !== "COMPLETED"
-                }
-                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-5 py-3 text-sm font-bold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={closeBill}
+                disabled={saving}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
               >
-                <Send size={16} />
-                {saving ? "Submitting..." : "Submit bill"}
+                <X size={16} />
+                Close bill
               </button>
             </div>
-          )}
-
-          {success && (
-            <p
-              role="status"
-              className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800"
-            >
-              {success}
-            </p>
-          )}
-
-          <div className="mt-5 flex justify-end">
-            <button
-              type="button"
-              onClick={closeBill}
-              disabled={saving}
-              className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-white disabled:opacity-50"
-            >
-              Close
-            </button>
           </div>
         </div>
       )}

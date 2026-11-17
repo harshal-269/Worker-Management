@@ -904,13 +904,15 @@ useEffect(() => {
           />
         )}
 
-<WorkerReviews
-            reviews={reviews}
-            reviewCount={reviewCount}
-            averageRating={averageRating}
-            reviewsError={reviewsError}
-            reviewsLoading={reviewsLoading}
-          />
+{activeSection === "reviews" && (
+  <WorkerReviews
+    reviews={reviews}
+    reviewCount={reviewCount}
+    averageRating={averageRating}
+    reviewsError={reviewsError}
+    reviewsLoading={reviewsLoading}
+  />
+)}
 
           {activeSection === "profile" && (
           <>
