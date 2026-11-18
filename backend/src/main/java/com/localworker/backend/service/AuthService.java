@@ -22,17 +22,20 @@ public class AuthService {
     private final WorkerRepository workerRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final RefreshTokenService refreshTokenService;
 
     public AuthService(
             UserRepository userRepository,
             WorkerRepository workerRepository,
             PasswordEncoder passwordEncoder,
-            JwtService jwtService) {
+            JwtService jwtService,
+            RefreshTokenService refreshTokenService) {
 
         this.userRepository = userRepository;
         this.workerRepository = workerRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.refreshTokenService = refreshTokenService;
     }
 
     @Transactional
@@ -93,7 +96,8 @@ public class AuthService {
         );
     }
 
-    public LoginResponse login(LoginRequest request) {
+    @Transactional
+    public LoginResult login(LoginRequest request) {
 
         User user = userRepository.findAllByEmail(request.getEmail())
                 .stream()
@@ -111,19 +115,33 @@ public class AuthService {
                         )
                 );
 
-        String token = jwtService.generateToken(
+        // Generate short-lived access JWT.
+        String accessToken = jwtService.generateToken(
                 user.getEmail(),
                 user.getRole()
         );
 
+        // Generate persistent refresh token.
+        String refreshToken =
+                refreshTokenService.createRefreshToken(user);
+
         String role = user.getRole().name();
 
-        return new LoginResponse(
-                token,
+        LoginResponse response = new LoginResponse(
+                accessToken,
                 "Login successful",
                 role,
                 user.getEmail(),
                 user.getName()
         );
+
+        return new LoginResult(response, refreshToken);
+    }
+
+    // Contains the normal login response and the refresh token separately.
+    public record LoginResult(
+            LoginResponse response,
+            String refreshToken
+    ) {
     }
 }

@@ -10,6 +10,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import NotificationBell from "../../pages/NotificationBell";
+import api from "../../api/axios";
 
 export interface DashboardNavItem {
   label: string;
@@ -50,12 +51,25 @@ export default function DashboardLayout({
     .map((part) => part[0].toUpperCase())
     .join("");
 
-  const logout = () => {
-    ["token", "role", "email", "name"].forEach((key) =>
-      sessionStorage.removeItem(key)
-    );
+  // Logout with backend refresh-token revocation
+  const logout = async () => {
+    try {
+      await api.post(
+        "/auth/logout",
+        {},
+        {
+          withCredentials: true,
+        }
+      );
+    } catch (error) {
+      console.error("Logout request failed:", error);
+    } finally {
+      ["token", "role", "email", "name"].forEach((key) =>
+        sessionStorage.removeItem(key)
+      );
 
-    navigate("/login", { replace: true });
+      navigate("/login", { replace: true });
+    }
   };
 
   const closeMobileMenu = () => setMobileMenuOpen(false);
